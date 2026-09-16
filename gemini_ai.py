@@ -12,7 +12,31 @@ import logging
 import google.genai as genai_client
 
 # Настройка proxy для Google API
-_PROXY_URL = 'http://127.0.0.1:10808'
+_PROXY_URL = None  # По умолчанию без proxy
+
+# Пробуем proxy, если недоступен - используем прямое соединение
+_PROXY_ATTEMPTS = [
+    'http://127.0.0.1:10808',
+    'http://127.0.0.1:10809',
+    None,  # Fallback на прямое соединение
+]
+
+def _get_proxy():
+    """Получить доступный proxy или None"""
+    import requests
+    for proxy_url in _PROXY_ATTEMPTS:
+        if proxy_url is None:
+            return None  # Прямое соединение всегда доступно
+        try:
+            r = requests.get('https://api.github.com', timeout=2, proxies={'http': proxy_url, 'https': proxy_url}, verify=False)
+            if r.status_code == 200:
+                log.info(f"[OK] Proxy доступен: {proxy_url}")
+                return proxy_url
+        except Exception as e:
+            log.debug(f"[WARN] Proxy {proxy_url} недоступен: {e}")
+            continue
+    log.warning("[WARN] Все proxy недоступны, используем прямое соединение")
+    return None
 
 log = logging.getLogger("jarvis.gemini")
 
@@ -40,12 +64,18 @@ def init_gemini(api_key=None):
             log.error("[ERR] Gemini API key not specified")
             return False
         
-        # Инициализация клиента с proxy
-        _gemini_client = genai_client.Client(
-            api_key=api_key,
-            http_options={'client_args': {'proxy': _PROXY_URL}}
-        )
-        log.info("[OK] Gemini client initialized with proxy")
+        # Получаем доступный proxy
+        proxy_url = _get_proxy()
+        
+        # Инициализация клиента
+        client_kwargs = {'api_key': api_key}
+        if proxy_url:
+            client_kwargs['http_options'] = {'client_args': {'proxy': proxy_url}}
+            log.info(f"[OK] Gemini client initialized with proxy: {proxy_url}")
+        else:
+            log.info("[OK] Gemini client initialized (direct connection)")
+        
+        _gemini_client = genai_client.Client(**client_kwargs)
         log.info(f"   API key: {api_key[:10]}...{api_key[-5:]}")
         
         # Пробуем разные модели

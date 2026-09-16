@@ -46,6 +46,7 @@ a = Analysis(
         ('sounds', 'sounds'),
         ('templates', 'templates'),
         ('jarvis_icon.ico', '.'),
+        ('C:\\Program Files\\WindowsApps\\PythonSoftwareFoundation.Python.3.13_3.13.3824.0_x64__qbz5n2kfra8p0\\Lib\\tkinter', 'tkinter'),
     ],
     hiddenimports=[
         'vosk',
@@ -101,7 +102,7 @@ exe = EXE(
     upx=True,
     upx_exclude=[],
     runtime_tmpdir=None,
-    console=False,  # Скрыть консоль
+    console=True,   # Показать консоль для отладки
     disable_windowed_traceback=False,
     argv_emulation=False,
     target_arch=None,

@@ -233,7 +233,7 @@ except Exception as e:
 # === GEMINI AI (вместо GigaChat) ===
 GEMINI_OK = False
 try:
-    from gemini_ai import init_gemini, is_gemini_available, get_gemini_status
+    from gemini_ai import init_gemini, is_gemini_available, get_gemini_status, ask_gemini
     GEMINI_API_KEY = "AQ.Ab8RN6JZNmnFKgsHRnWI9-riAbXaq9-XCPQn0L1VwIeWcg1WQw"
     if init_gemini(GEMINI_API_KEY):
         GEMINI_OK = True
@@ -3276,19 +3276,39 @@ class JARVISUltimate(tk.Tk):
             else:
                 log.warning(f"⚠️ [ПРИВЕТСТВИЕ] Нет голоса для Astra: {astra_voice}")
             
-            if not self.user_name:
-                # Первый запуск - представляемся
-                greeting = "Привет! Я Джарвис - ваш персональный ИИ-ассистент. Я буду вашим верным помощником.\n\nДавайте познакомимся! Как вас зовут?"
-                self.add_to_dialog(greeting, is_response=True)
-                self.speak_jarvis_free(greeting)
+            # === НЕТ ЖЁСТКО ЗАКОДИРОВАННЫХ ОТВЕТОВ - ВСЕ ЧЕРЕЗ AI ===
+            # Приветствие генерируется через Gemini AI
+            if self.gemini_enabled and GEMINI_OK:
+                log.info("🤖 [ПРИВЕТСТВИЕ] Отправляем запрос к Gemini AI для приветствия...")
+                # Запрашиваем у AI приветственное сообщение
+                ai_prompt = "Привет! Представься как ИИ-ассистент Джарвис. Спроси как дела у пользователя и его семьи. Отвечай кратко на русском языке."
+                
+                def _get_ai_greeting():
+                    try:
+                        response = ask_gemini(ai_prompt, system_prompt=self.personas.get(self.current_persona, {}).get('system_prompt', ''))
+                        if response:
+                            log.info(f"✅ [ПРИВЕТСТВИЕ] AI ответ: {response[:100]}...")
+                            self.after(0, lambda: self._speak_ai_greeting(response))
+                        else:
+                            log.warning("⚠️ [ПРИВЕТСТВИЕ] Gemini не ответил, используем простое приветствие")
+                            self.after(0, lambda: self._speak_ai_greeting("Привет! Я Джарвис, ваш ИИ-ассистент. Чем могу помочь?"))
+                    except Exception as e:
+                        log.error(f"❌ [ПРИВЕТСТВИЕ] Ошибка AI: {e}")
+                        self.after(0, lambda: self._speak_ai_greeting("Привет! Я Джарвис, ваш ИИ-ассистент. Чем могу помочь?"))
+                
+                # Запускаем в отдельном потоке чтобы не блокировать UI
+                threading.Thread(target=_get_ai_greeting, daemon=True).start()
             else:
-                # Повторный запуск - приветствуем по имени
-                if self.user_gender == 'female':
-                    greeting = f"С возвращением, {self.user_name}! Я скучал по вам. Чем могу помочь?"
-                else:
-                    greeting = f"С возвращением, {self.user_name}! Я скучал по вам. Чем могу помочь?"
+                # Gemini недоступен - используем простое приветствие
+                log.warning("⚠️ [ПРИВЕТСТВИЕ] Gemini недоступен, используем простое приветствие")
+                greeting = "Привет! Я Джарвис, ваш ИИ-ассистент. Чем могу помочь?"
                 self.add_to_dialog(greeting, is_response=True)
                 self.speak_jarvis_free(greeting)
+    
+    def _speak_ai_greeting(self, greeting):
+        """Озвучивает приветствие от AI"""
+        self.add_to_dialog(greeting, is_response=True)
+        self.speak_jarvis_free(greeting)
     
     def _resolve_document_path(self, requested):
         requested = requested.strip().strip('"').strip("'")
