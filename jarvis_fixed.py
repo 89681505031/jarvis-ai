@@ -3412,6 +3412,19 @@ class JARVISUltimate(tk.Tk):
         # Если разделителей нет - возвращаем одну команду
         return [cmd_text]
 
+    def ask_gemini(self, user_message):
+        """Вызывает Gemini AI через модуль gemini_ai"""
+        try:
+            # Получаем system_prompt текущего персонажа
+            system_prompt = self.personas.get(self.current_persona, {}).get('system_prompt', '')
+            
+            # Вызываем Gemini из модуля
+            response = ask_gemini(user_message, system_prompt=system_prompt)
+            return response
+        except Exception as e:
+            log.error(f"❌ [ASK_GEMINI] Ошибка: {e}", exc_info=True)
+            return None
+    
     def execute_command_text(self, cmd_text, play_intro=True):
         cmd = cmd_text.lower().strip()
         if not cmd:
@@ -5198,15 +5211,18 @@ class JARVISUltimate(tk.Tk):
                         # Пропускаем ИИ для обработки
                         pass
                     
-                    # === ВЫБОР AI: Gemini или GigaChat ===
+                    # === ТОЛЬКО GEMINI AI (GigaChat удалён) ===
                     if self.gemini_enabled:
                         log.info("🤖 [GEMINI] Отправляю запрос...")
                         raw_reply = self.ask_gemini(cmd)
-                        log.info("✅ Gemini: ответ получен")
+                        if raw_reply:
+                            log.info("✅ Gemini: ответ получен")
+                        else:
+                            log.warning("⚠️ [GEMINI] Не получил ответ")
+                            raw_reply = "Извините, я сейчас не могу обработать ваш запрос. Попробуйте ещё раз."
                     else:
-                        log.info("🤖 [GIGACHAT] Отправляю запрос...")
-                        raw_reply = self.ask_gigachat(cmd)
-                        log.info("✅ GigaChat: ответ получен")
+                        log.error("❌ [GEMINI] Не доступен!")
+                        raw_reply = "Gemini AI недоступен. Проверьте подключение к интернету."
                     
                     # === ДОБАВЛЯЕМ ИМЯ ПЕРСОНАЖА К ОТВЕТУ ===
                     persona_name = self.personas.get(self.current_persona, {}).get('name', 'Jarvis')
@@ -5230,12 +5246,8 @@ class JARVISUltimate(tk.Tk):
                         self._safe_speak(reply_text)
                         
                 except Exception as exc:
-                    if self.gemini_enabled:
-                        log.error("❌ [GEMINI] недоступен: %s", exc)
-                        reply = f"Gemini недоступен: {str(exc)[:120]}"
-                    else:
-                        log.error("❌ [GIGACHAT] недоступен: %s", exc)
-                        reply = f"GigaChat недоступен: {str(exc)[:120]}"
+                    log.error("❌ [AI] Ошибка: %s", exc)
+                    reply = f"Ошибка AI: {str(exc)[:120]}"
                     if not ai_executed:
                         self._safe_add_dialog(reply, is_response=True)
                         self._safe_speak(reply)
