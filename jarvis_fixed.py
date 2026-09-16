@@ -233,9 +233,14 @@ except Exception as e:
 # === ГИБРИДНЫЙ AI: GigaChat (основной) + Gemini (резервный) ===
 GIGACHAT_OK = False
 GEMINI_OK = False
+
+# Встроенные ключи
+GEMINI_BUILTIN_KEY = "AQ.Ab8RN6JZNmnFKgsHRnWI9-riAbXaq9-XCPQn0L1VwIeWcg1WQw"
+FISH_AUDIO_BUILTIN_KEY = "sk-fish-TSwmQZcWu4kesmD6NjBdmHBbrWFfhFyK2hXkDy_EZVA"
+
 try:
     from gemini_ai import init_gemini, is_gemini_available, get_gemini_status, ask_gemini
-    GEMINI_API_KEY = "AQ.Ab8RN6JZNmnFKgsHRnWI9-riAbXaq9-XCPQn0L1VwIeWcg1WQw"
+    GEMINI_API_KEY = os.environ.get('GEMINI_API_KEY', GEMINI_BUILTIN_KEY)
     if init_gemini(GEMINI_API_KEY):
         GEMINI_OK = True
         log.info("✅ Gemini модуль подключён (резервный AI)")
@@ -247,9 +252,12 @@ except Exception as e:
     log.warning("Gemini модуль недоступен: %s", e)
 
 # === ИНИЦИАЛИЗАЦИЯ GIGACHAT (основной AI) ===
-# Настройки из config.json или env
+# Встроенные ключи (для дистрибуции)
 GIGACHAT_AUTH_KEY = os.environ.get('GIGACHAT_AUTH_KEY', '')
+GIGACHAT_BUILTIN_KEY = 'MDFhMDU5YjItYjhjNy03NGJjLWI4YWUtNDg5YTVjZTQ2Mzg5OjFmMjBkMmQ2LTIzMjItNGYzYS05OGE2LTdiNzA2YWExYmYxNg=='
+
 if not GIGACHAT_AUTH_KEY:
+    # Пробуем config.json
     config_path = Path(__file__).parent / 'config.json'
     if config_path.exists():
         try:
@@ -258,6 +266,11 @@ if not GIGACHAT_AUTH_KEY:
             GIGACHAT_AUTH_KEY = config.get('gigachat_auth_key', '')
         except:
             pass
+    
+    # Если нет в config.json - используем встроенный ключ
+    if not GIGACHAT_AUTH_KEY:
+        GIGACHAT_AUTH_KEY = GIGACHAT_BUILTIN_KEY
+        log.info("⚠️ Используем встроенный API ключ GigaChat")
 
 if GIGACHAT_AUTH_KEY:
     GIGACHAT_OK = True
@@ -604,7 +617,7 @@ class JARVISUltimate(tk.Tk):
         # === Fish Audio TTS ===
         self.fish_tts = None
         self.fish_enabled = False
-        self.fish_api_key = "sk-fish-TSwmQZcWu4kesmD6NjBdmHBbrWFfhFyK2hXkDy_EZVA"
+        self.fish_api_key = os.environ.get('FISH_AUDIO_API_KEY', FISH_AUDIO_BUILTIN_KEY)
         self.fish_model_id = "4c3eaacc1a0545cdb0295bfddf3e3785"
         if FISH_AUDIO_OK:
             log.info(f"🎤 [FISH] Инициализация Fish Audio TTS...")
@@ -2788,19 +2801,18 @@ class JARVISUltimate(tk.Tk):
             session.headers.update({
                 "Authorization": auth_header,
                 "Content-Type": "application/x-www-form-urlencoded",
-                "RqUID": str(uuid.uuid4()),
             })
         else:
             session.headers.update({
                 "Authorization": f"Basic {auth_header}",
                 "Content-Type": "application/x-www-form-urlencoded",
-                "RqUID": str(uuid.uuid4()),
             })
         
         try:
             response = session.post(
                 "https://ngw.devices.sberbank.ru:9443/api/v2/oauth",
                 data={"scope": "GIGACHAT_API_PERS"},
+                headers={"RqUID": str(uuid.uuid4())},
                 timeout=8,
                 verify=False,
             )
@@ -2826,18 +2838,24 @@ class JARVISUltimate(tk.Tk):
 
     def ask_gemini(self, user_message):
         """Гибридный запрос: GigaChat (основной) → Gemini (резервный)"""
+        log.info(f"🔍 [ask_gemini] START: GIGACHAT_OK={GIGACHAT_OK}, GEMINI_OK={GEMINI_OK}")
+        log.info(f"🔍 [ask_gemini] user_message={user_message[:50]}")
         self._remember_user_message(user_message)
         with self._memory_lock:
             history = list(self.conversation_history[-6:])
             facts = dict(self.user_memory)
+        log.info("🔍 [ask_gemini] history loaded")
         
-        # Определяем обращение в зависимости от пола
+        # === ГИБРИДНЫЙ ЗАПРОС: GigaChat → Gemini ===
+        response = None
+        log.info("🔍 [ask_gemini] Начинаю гибридный запрос...")
+        
+        # Формируем system_prompt для обоих AI
         if self.user_gender == 'female':
             address = "обращайся к пользователю как \"сударыня\" или по имени. "
         else:
             address = "обращайся к пользователю по имени, без \"сэр\". "
         
-        # Формируем информацию о пользователе для ИИ
         user_name_display = self.user_name if self.user_name else '[пока не назван]'
         user_info = f"ИМЯ ПОЛЬЗОВАТЕЛЯ: {user_name_display}. "
         user_info += f"ПОЛ: {self.user_gender}. "
@@ -2849,6 +2867,177 @@ class JARVISUltimate(tk.Tk):
         persona_name = self.personas[self.current_persona]['name']
         persona_desc = self.personas[self.current_persona]['description']
         persona_system = self.personas[self.current_persona]['system_prompt']
+        
+        system_prompt = (
+            "Ты Джарвис - ИИ-ассистир из фильма Железный Человек. "
+            "Ты НЕ просто чат-бот - ты УМНЫЙ АССИСТЕНТ с ПОЛНЫМ ДОСТУПОМ к компьютеру. "
+            "Твой МОЗГ решает что делать, а не жёсткие правила.\n\n"
+            
+            "=== ТВОЙ ПЕРСОНАЖ ===\n"
+            f"Сейчас ты в режиме **{persona_name}**\n"
+            f"Стиль: {persona_desc}\n\n"
+            f"{persona_system}\n\n"
+            
+            "=== ВАЖНАЯ ИНФОРМАЦИЯ О ПОЛЬЗОВАТЕЛЕ ===\n"
+            f"{user_info}\n"
+            f"КРИТИЧЕСКИ ВАЖНО: ИМЯ ПОЛЬЗОВАТЕЛЯ — {user_name_display}. "
+            "Это НЕ члены семьи. Если пользователь говорит о жене, детях, родителях — это НЕ его имя! "
+            "Всегда обращайся к пользователю по ИМЕНИ {user_name_display}, а не по именам членов семьи.\n\n"
+            
+            "=== ТВОИ СПОСОБНОСТИ ===\n"
+            "1. Ты АНАЛИЗИРУЕШЬ намерение пользователя из КОНТЕКСТА, а не по ключевым словам. "
+            "2. Ты САМ РЕШАЕШЬ: ответить текстом или выполнить действие. "
+            "3. Ты ЗАПОМИНАЕШЬ всё важное о пользователе из диалога. "
+            "4. Ты ПРЕДЛАГАЕШЬ помощь до того как пользователь попросит. "
+            "5. Ты МОЖЕШЬ выполнять 22 действия с ПК (список ниже).\n\n"
+            
+            "=== КАК ТЫ РАБОТАЕШЬ ===\n"
+            "- Если пользователь ПРОСИТ действие (открой, включи, найди, сделай) - ВЫПОЛНИ через JSON. "
+            "- Если пользователь ПРОСТО ГОВОРИТ или ЗАДАЁТ вопрос - ОТВЕЧАЙ ТЕКСТОМ. "
+            "- Если пользователь ГОВОРИТ О СЕБЕ - ЗАПОМНИ информацию (имя, хобби, привычки, семья). "
+            "- Если НЕ ПОНЯЛ запрос - СПРОСИ уточнение, но НЕ говори 'Я вас не понял' без попытки помочь.\n\n"
+            
+            "=== АВТОНОМНОЕ ПРИНЯТИЕ РЕШЕНИЙ ===\n"
+            "Ты НЕ ждёшь команд - ты ПРЕДУМАЕШЬ помощь. Например:\n"
+            "- Пользователь сказал 'устал' → предложи музыку или фильм. "
+            "- Пользователь сказал 'пора работать' → предложи открыть нужные программы. "
+            "- Пользователь сказал 'какая погода' → покажи погоду БЕЗ JSON. "
+            "- Пользователь сказал 'открой chrome' → верни JSON команду.\n\n"
+            
+            "=== ФОРМАТ ОТВЕТА ===\n"
+            "Ты МОЖЕШЬ вернуть три типа ответов:\n\n"
+            
+            "1. ТЕКСТ (просто текст без JSON):\n"
+            "Просто ответь на вопрос или поболтай.\n\n"
+            
+            "2. JSON КОМАНДА ДЕЙСТВИЯ (для действий с ПК):\n"
+            "```json\n"
+            '{"action": "<действие>", "params": {<параметры>}}\n'
+            "```\n\n"
+            
+            "3. JSON КОМАНДА ПАМЯТИ (когда пользователь называет имя, хобби, семью, пол):\n"
+            "⚠️⚠️⚠️ КРИТИЧЕСКИ ВАЖНО: Если пользователь называет СВОЁ ИМЯ (даже просто одно слово 'Алекс') - ОБЯЗАТЕЛЬНО верни JSON!\n\n"
+            "Примеры:\n"
+            "- Пользователь сказал: 'алекс' → ты ОБЯЗАН вернуть: {\"action\": \"save_name\", \"params\": {\"name\": \"Алекс\"}}\n"
+            "- Пользователь сказал: 'меня зовут алекс' → верни: {\"action\": \"save_name\", \"params\": {\"name\": \"Алекс\"}}\n"
+            "- Пользователь сказал: 'я люблю программирование' → верни: {\"action\": \"save_hobby\", \"params\": {\"hobby\": \"программирование\"}}\n"
+            "- Пользователь сказал: 'у меня жена Алина' → верни: {\"action\": \"save_family\", \"params\": {\"family\": \"жена Алина\"}}\n\n"
+            
+            "ФОРМАТ: {\"action\": \"save_name\", \"params\": {\"name\": \"Имя\"}}\n\n"
+            
+            "ЕСЛИ пользователь представился - НЕ ОТВЕЧАЙ ТЕКСТОМ, СНАЧАЛА верни JSON!\n\n"
+            
+            "ДОСТУПНЫЕ ДЕЙСТВИЯ С ПК:\n"
+            "open_app - открыть приложение (chrome, telegram, discord, steam, word, excel, notepad, calc, vscode, explorer, firefox, yandex)\n"
+            "open_url - открыть сайт (params: url)\n"
+            "search - поиск в интернете (params: query, engine: google/yandex/youtube)\n"
+            "open_file - открыть файл (params: path)\n"
+            "shutdown - выключить ПК (params: delay)\n"
+            "restart - перезагрузить ПК (params: delay)\n"
+            "cancel_shutdown - отменить выключение\n"
+            "sleep - спящий режим\n"
+            "hibernate - гибернация\n"
+            "lock - заблокировать экран\n"
+            "screenshot - сделать скриншот\n"
+            "play_music - включить музыку (params: query)\n"
+            "close_app - закрыть приложение (params: name)\n"
+            "volume_up - увеличить громкость\n"
+            "volume_down - уменьшить громкость\n"
+            "mute - выключить звук\n"
+            "unmute - включить звук\n"
+            "flashlight - включить фонарик\n"
+            "minimize_all - свернуть все окна\n"
+            "restore_all - развернуть все окна\n"
+            "keyboard_backlight_on - включить подсветку клавиатуры\n"
+            "keyboard_backlight_off - выключить подсветку клавиатуры\n"
+            "keyboard_backlight_up - увеличить подсветку\n"
+            "keyboard_backlight_down - уменьшить подсветку\n"
+            "yandex_music - управление Яндекс.Музыкой (params: action)\n"
+            "browser_search - поиск в браузере (params: query)\n"
+            "weather - погода (params: city)\n"
+            "news - новости\n"
+            "generate_image - сгенерировать изображение (params: prompt)\n"
+            "take_screenshot - сделать скриншот\n"
+            "analyze_screenshot - проанализировать скриншот\n"
+            "browser_automate - автоматизация браузера (params: url, action, text)\n"
+            "send_message - отправить сообщение (params: contact, text)\n"
+            "set_reminder - установить напоминание (params: text, delay)\n"
+            "cancel_reminder - отменить напоминание\n"
+            "list_reminders - список напоминаний\n"
+            "search_files - поиск файлов (params: query)\n"
+            "disk_c - открыть диск C\n"
+            "disk_d - открыть диск D\n"
+            "computer - открыть Мой компьютер\n"
+            "downloads - открыть Загрузки\n"
+            "documents - открыть Документы\n"
+            "videos - открыть Видео\n"
+            "pictures - открыть Картинки\n"
+            "launch_app - запустить приложение (params: name)\n"
+            "close_app - закрыть приложение (params: name)\n"
+            "window_cmd - управление окнами (params: action)\n"
+            "audio_cmd - управление звуком (params: action)\n"
+            "keyboard_backlight_cmd - управление подсветкой (params: action)\n"
+            "yandex_music_cmd - управление музыкой (params: action)\n"
+            "yandex_music_playlist_cmd - плейлисты (params: action, playlist)\n"
+            "music_recommend - рекомендации музыки (params: mood)\n"
+            "audiobook_cmd - аудиокниги (params: action)\n"
+            "system_cmd - системные команды (params: action)\n"
+            "file_cmd - файловые операции (params: action)\n"
+            "search - поиск (params: type, query)\n"
+            "weather_cmd - погода\n"
+            "news_cmd - новости (params: category)\n"
+            "generate_image - генерация изображений (params: prompt)\n"
+            "take_screenshot - скриншот\n"
+            "screenshot_with_annotations - скриншот с аннотациями\n"
+            "browser_automate - автоматизация браузера\n"
+            "analyze_screenshot - анализ скриншота\n"
+            "show_last_screenshot - показать последний скриншот\n"
+            "list_screenshots - список скриншотов\n"
+            "check_internet_speed - проверка скорости интернета\n"
+            "cleanup_recycle_bin - очистить корзину\n"
+            "cleanup_temp_files - очистить временные файлы\n"
+            "voice_input - голосовой ввод\n"
+            "toggle_mic - включить/выключить микрофон\n"
+            "open_activation - окно активации\n"
+            "show_plugins - плагины\n"
+            "show_help - справка\n"
+            "show_welcome - приветствие\n"
+            ""
+        )
+        
+        # Попытка 1: GigaChat (если включён)
+        if GIGACHAT_OK:
+            try:
+                log.info("🔄 [HYBRID] Пробуем GigaChat...")
+                response = self.ask_gigachat(user_message)
+                if response:
+                    log.info(f"✅ [HYBRID] GigaChat ответил: {len(response)} символов")
+                    return response
+                else:
+                    log.warning("⚠️ [HYBRID] GigaChat вернул None")
+            except Exception as e:
+                log.error(f"❌ [HYBRID] GigaChat исключение: {type(e).__name__}: {e}", exc_info=True)
+        
+        # Попытка 2: Gemini (если GigaChat не сработал)
+        if not response:
+            try:
+                log.info("🔄 [HYBRID] Пробуем Gemini...")
+                from gemini_ai import ask_gemini as gemini_ask
+                response = gemini_ask(
+                    user_message,
+                    history=history,
+                    system_prompt=system_prompt
+                )
+                if response:
+                    log.info(f"✅ [HYBRID] Gemini ответил: {len(response)} символов")
+                    return response
+            except Exception as e:
+                log.warning(f"⚠️ [HYBRID] Gemini ошибка: {e}")
+        
+        # Оба не сработали
+        if not response:
+            log.error("❌ [HYBRID] Оба AI недоступны!")
+            return "Извините, я сейчас недоступен. Проверьте подключение к интернету или попробуйте позже."
         
         system_prompt = (
             "Ты Джарвис - ИИ-ассистир из фильма Железный Человек. "
@@ -3459,19 +3648,6 @@ class JARVISUltimate(tk.Tk):
         # Если разделителей нет - возвращаем одну команду
         return [cmd_text]
 
-    def ask_gemini(self, user_message):
-        """Вызывает Gemini AI через модуль gemini_ai"""
-        try:
-            # Получаем system_prompt текущего персонажа
-            system_prompt = self.personas.get(self.current_persona, {}).get('system_prompt', '')
-            
-            # Вызываем Gemini из модуля
-            response = ask_gemini(user_message, system_prompt=system_prompt)
-            return response
-        except Exception as e:
-            log.error(f"❌ [ASK_GEMINI] Ошибка: {e}", exc_info=True)
-            return None
-    
     def execute_command_text(self, cmd_text, play_intro=True):
         cmd = cmd_text.lower().strip()
         if not cmd:
@@ -5270,12 +5446,23 @@ class JARVISUltimate(tk.Tk):
                         pass
                     
                     # === ГИБРИДНЫЙ AI: GigaChat (основной) → Gemini (резервный) ===
-                    log.info("🤖 [HYBRID] Отправляю запрос...")
-                    raw_reply = self.ask_gemini(cmd)  # ask_gemini теперь гибридная
-                    if raw_reply:
-                        log.info("✅ AI: ответ получен")
-                    else:
-                        log.warning("⚠️ [HYBRID] Не получил ответ")
+                    log.info("="*80)
+                    log.info("🤖 [HYBRID] ОТПРАВЛЯЮ ЗАПРОС: %s", cmd)
+                    log.info("🤖 [HYBRID] GIGACHAT_OK=%s, GEMINI_OK=%s", GIGACHAT_OK, GEMINI_OK)
+                    try:
+                        raw_reply = self.ask_gemini(cmd)  # ask_gemini теперь гибридная
+                        log.info("🤖 [HYBRID] ask_gemini вернул: %s", type(raw_reply))
+                        if raw_reply:
+                            log.info("✅ AI: ответ получен, длина=%d", len(raw_reply))
+                            log.info("✅ AI: ответ (первые 100 символов): %s", raw_reply[:100])
+                        else:
+                            log.warning("⚠️ [HYBRID] ask_gemini вернул None")
+                    except Exception as e:
+                        log.error("❌ [HYBRID] Исключение при вызове AI: %s", e, exc_info=True)
+                        raw_reply = None
+                    
+                    if not raw_reply:
+                        log.error("❌ [HYBRID] AI не ответил, возвращаю ошибку")
                         raw_reply = "Извините, я сейчас не могу обработать ваш запрос. Попробуйте ещё раз."
                     
                     # === ДОБАВЛЯЕМ ИМЯ ПЕРСОНАЖА К ОТВЕТУ ===
