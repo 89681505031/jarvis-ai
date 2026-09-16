@@ -331,6 +331,52 @@ PLUGINS = {
     'system_tray': {'enabled': TRAY_OK, 'name': '🔽 Системный трей'},
 }
 
+# === КОНФИГУРАЦИЯ АВТООБНОВЛЕНИЯ ===
+CURRENT_VERSION = "2.0.0"
+GITHUB_REPO = "89681505031/jarvis-ai"
+RELEASES_URL = f"https://github.com/{GITHUB_REPO}/releases"
+
+def check_for_updates():
+    """Проверяет обновления через GitHub API"""
+    try:
+        import requests
+        
+        # Получаем последний релиз
+        api_url = f"https://api.github.com/repos/{GITHUB_REPO}/releases/latest"
+        
+        # Proxy настройки
+        proxies = None
+        proxy_url = os.environ.get('HTTP_PROXY', os.environ.get('HTTPS_PROXY', ''))
+        if proxy_url:
+            proxies = {'http': proxy_url, 'https': proxy_url}
+        else:
+            # Пробуем прямой proxy
+            try:
+                r = requests.get('https://api.github.com', timeout=3, proxies={'http': 'http://127.0.0.1:10808', 'https': 'http://127.0.0.1:10808'}, verify=False)
+                if r.status_code == 200:
+                    proxies = {'http': 'http://127.0.0.1:10808', 'https': 'http://127.0.0.1:10808'}
+            except:
+                pass  # Без proxy
+        
+        response = requests.get(api_url, timeout=10, proxies=proxies, verify=False)
+        
+        if response.status_code == 200:
+            release = response.json()
+            latest_version = release.get('tag_name', '1.0.0').lstrip('v')
+            
+            # Сравниваем версии
+            if latest_version > CURRENT_VERSION:
+                log.info(f"🔄 Доступна новая версия: {latest_version} (текущая: {CURRENT_VERSION})")
+                return latest_version, release
+            else:
+                log.info(f"✅ Актуальная версия: {CURRENT_VERSION}")
+        else:
+            log.info(f"⚠️ Не удалось проверить обновления (HTTP {response.status_code})")
+    except Exception as e:
+        log.info(f"⚠️ Проверка обновлений: {e}")
+    
+    return None, None
+
 class ModernButton(tk.Button):
     def __init__(self, master, **kwargs):
         bg = kwargs.pop('bg', '#1e293b')
@@ -599,6 +645,11 @@ class JARVISUltimate(tk.Tk):
             self._run_background(self.start_background_listener)
         
         self.protocol("WM_DELETE_WINDOW", self.hide_to_background)
+        
+        # === АВТООБНОВЛЕНИЕ ===
+        self.current_version = CURRENT_VERSION
+        self.after(2000, self.check_for_updates)  # Проверка через 2 сек после запуска
+        
         self.show_welcome()
 
     def _run_background(self, target, *args):
@@ -612,6 +663,105 @@ class JARVISUltimate(tk.Tk):
         }
         self.current_branch = "main"
         log.info("🌿 Инициализация ветвления диалога")
+    
+    def check_for_updates(self):
+        """Проверяет доступные обновления через GitHub"""
+        try:
+            log.info("🔄 Проверка обновлений...")
+            
+            latest_version, release = check_for_updates()
+            
+            if latest_version and release:
+                # Есть обновление - показываем диалог
+                self.after(0, lambda: self.show_update_dialog(latest_version, release))
+        except Exception as e:
+            log.error(f"Ошибка проверки обновлений: {e}")
+    
+    def show_update_dialog(self, latest_version, release):
+        """Показывает диалог обновления"""
+        try:
+            # Создаём окно обновления
+            update_window = tk.Toplevel(self)
+            update_window.title("🔄 Обновление JARVIS")
+            update_window.geometry("500x400")
+            update_window.resizable(False, False)
+            update_window.configure(bg='#1e293b')
+            
+            # Центрируем окно
+            update_window.transient(self)
+            update_window.grab_set()
+            
+            x = self.winfo_x() + (self.winfo_width() - 500) // 2
+            y = self.winfo_y() + (self.winfo_height() - 400) // 2
+            update_window.geometry(f"+{x}+{y}")
+            
+            # Заголовок
+            title_label = tk.Label(
+                update_window,
+                text=f"🔄 Доступна новая версия: {latest_version}",
+                font=('Segoe UI', 14, 'bold'),
+                fg='#38bdf8',
+                bg='#1e293b'
+            )
+            title_label.pack(pady=(20, 10))
+            
+            # Описание
+            desc = tk.Label(
+                update_window,
+                text=f"Текущая версия: {CURRENT_VERSION}\n\n"
+                     f"Что нового:\n"
+                     f"• Fish Audio TTS - голос разных персонажей\n"
+                     f"• Vosk STT - оффлайн распознавание речи\n"
+                     f"• Gemini AI - умный диалог\n"
+                     f"• Исправления и улучшения",
+                font=('Segoe UI', 10),
+                fg='#e2e8f0',
+                bg='#1e293b',
+                justify='left',
+                wraplength=450
+            )
+            desc.pack(pady=10)
+            
+            # Кнопки
+            btn_frame = tk.Frame(update_window, bg='#1e293b')
+            btn_frame.pack(pady=20)
+            
+            # Скачать
+            def download_update():
+                webbrowser.open(RELEASES_URL)
+                update_window.destroy()
+            
+            download_btn = ModernButton(
+                btn_frame,
+                text="📥 Скачать обновление",
+                font=('Segoe UI', 11, 'bold'),
+                bg='#0ea5e9',
+                fg='white',
+                activebackground='#0284c7',
+                activeforeground='white',
+                command=download_update
+            )
+            download_btn.pack(side='left', padx=10, ipadx=20, ipady=10)
+            
+            # Позже
+            def dismiss_update():
+                update_window.destroy()
+            
+            dismiss_btn = ModernButton(
+                btn_frame,
+                text="Напомнить позже",
+                font=('Segoe UI', 11),
+                bg='#334155',
+                fg='#94a3b8',
+                activebackground='#475569',
+                activeforeground='white',
+                command=dismiss_update
+            )
+            dismiss_btn.pack(side='left', padx=10, ipadx=20, ipady=10)
+            
+            log.info(f"✅ Показано обновление до {latest_version}")
+        except Exception as e:
+            log.error(f"Ошибка диалога обновления: {e}")
     
     def switch_persona(self, persona_name, immediate_speak=True):
         """Переключает персонажа (Astra/Luna/Terra/Cyber/Jarvis)
