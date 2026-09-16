@@ -3002,8 +3002,8 @@ class JARVISUltimate(tk.Tk):
         
         # GigaChat не ответил
         if not response:
-            log.error("❌ [ask_gemini] GigaChat недоступен!")
-            return "Извините, я сейчас недоступен. Проверьте подключение к интернету."
+            log.error("❌ [ask_gemini] GigaChat не ответил!")
+            return "Извините, я сейчас не могу обработать ваш запрос. Попробуйте позже."
         
         system_prompt = (
             "Ты Джарвис - ИИ-ассистир из фильма Железный Человек. "
