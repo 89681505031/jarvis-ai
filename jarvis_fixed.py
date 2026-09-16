@@ -239,7 +239,7 @@ FISH_AUDIO_BUILTIN_KEY = "sk-fish-TSwmQZcWu4kesmD6NjBdmHBbrWFfhFyK2hXkDy_EZVA"
 # === ИНИЦИАЛИЗАЦИЯ GIGACHAT (основной AI) ===
 # Встроенные ключи (для дистрибуции)
 GIGACHAT_AUTH_KEY = os.environ.get('GIGACHAT_AUTH_KEY', '')
-GIGACHAT_BUILTIN_KEY = 'MDFhMDU5YjItYjhjNy03NGJjLWI4YWUtNDg5YTVjZTQ2Mzg5OmE1Y2Y5YWZlLWRiMTUtNDY5Ni05N2M1LTNkZThjYmNiY2I1ZQ=='
+GIGACHAT_BUILTIN_KEY = 'MDFhMDU5YjItYjhjNy03NGJjLWI4YWUtNDg5YTVjZTQ2Mzg5OmVkMzRiNzhlLTIzNzMtNGI2NC05M2ZlLWVkZjkwNmJlNmQ2MA=='
 
 if not GIGACHAT_AUTH_KEY:
     # Пробуем config.json
@@ -353,7 +353,7 @@ PLUGINS = {
 }
 
 # === КОНФИГУРАЦИЯ АВТООБНОВЛЕНИЯ ===
-CURRENT_VERSION = "2.0.0"
+CURRENT_VERSION = "2.2.1"
 GITHUB_REPO = "89681505031/jarvis-ai"
 RELEASES_URL = f"https://github.com/{GITHUB_REPO}/releases"
 
@@ -365,21 +365,8 @@ def check_for_updates():
         # Получаем последний релиз
         api_url = f"https://api.github.com/repos/{GITHUB_REPO}/releases/latest"
         
-        # Proxy настройки
-        proxies = None
-        proxy_url = os.environ.get('HTTP_PROXY', os.environ.get('HTTPS_PROXY', ''))
-        if proxy_url:
-            proxies = {'http': proxy_url, 'https': proxy_url}
-        else:
-            # Пробуем прямой proxy
-            try:
-                r = requests.get('https://api.github.com', timeout=3, proxies={'http': 'http://127.0.0.1:10808', 'https': 'http://127.0.0.1:10808'}, verify=False)
-                if r.status_code == 200:
-                    proxies = {'http': 'http://127.0.0.1:10808', 'https': 'http://127.0.0.1:10808'}
-            except:
-                pass  # Без proxy
-        
-        response = requests.get(api_url, timeout=10, proxies=proxies, verify=False)
+        # Без proxy - напрямую
+        response = requests.get(api_url, timeout=10, verify=False)
         
         if response.status_code == 200:
             release = response.json()
@@ -390,13 +377,24 @@ def check_for_updates():
                 log.info(f"🔄 Доступна новая версия: {latest_version} (текущая: {CURRENT_VERSION})")
                 return latest_version, release
             else:
-                log.info(f"✅ Актуальная версия: {CURRENT_VERSION}")
+                log.info(f"✅ Версия {CURRENT_VERSION} - актуальная")
+                return None, None
+        elif response.status_code == 404:
+            # Release не найден - это нормально, просто нет новой версии
+            log.info(f"✅ Версия {CURRENT_VERSION} - актуальная (releases не настроены)")
+            return None, None
         else:
-            log.info(f"⚠️ Не удалось проверить обновления (HTTP {response.status_code})")
+            log.warning(f"⚠️ Проверка обновлений: HTTP {response.status_code}")
+            return None, None
+    except requests.exceptions.Timeout:
+        log.info(f"⏱️ Проверка обновлений: таймаут")
+        return None, None
+    except requests.exceptions.ConnectionError:
+        log.info(f"🌐 Проверка обновлений: нет подключения к интернету")
+        return None, None
     except Exception as e:
         log.info(f"⚠️ Проверка обновлений: {e}")
-    
-    return None, None
+        return None, None
 
 class ModernButton(tk.Button):
     def __init__(self, master, **kwargs):
