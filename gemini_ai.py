@@ -78,8 +78,8 @@ def init_gemini(api_key=None):
         _gemini_client = genai_client.Client(**client_kwargs)
         log.info(f"   API key: {api_key[:10]}...{api_key[-5:]}")
         
-        # Пробуем разные модели
-        model_names = ['gemini-3.6-flash', 'gemini-3.1-pro-preview', 'gemini-2.5-flash']
+        # Пробуем разные модели (приоритет на быстрые)
+        model_names = ['gemini-2.5-flash', 'gemini-3.1-pro-preview', 'gemini-3.6-flash']
         
         for name in model_names:
             try:
@@ -115,6 +115,12 @@ def ask_gemini(user_message, history=None, system_prompt=None):
     
     if not _gemini_available or _gemini_client is None:
         log.error("[ERR] Gemini not initialized")
+        # Возвращаем fallback ответ
+        return "Извините, я сейчас недоступен. Попробуйте позже."
+    
+    # Если сообщение короткое (меньше 5 символов) - это возможно ошибка, не отправляем
+    if len(user_message.strip()) < 3:
+        log.debug(f"[SKIP] Слишком короткое сообщение: {len(user_message)} chars")
         return None
     
     try:
@@ -151,13 +157,15 @@ def ask_gemini(user_message, history=None, system_prompt=None):
                 config=config
             )
         
-        # Retry с разными моделями при ошибке
-        retry_models = ['gemini-3.6-flash', 'gemini-3.1-pro-preview', 'gemini-2.5-flash']
+        # Retry с разными моделями при ошибке (включая 429 Too Many Requests)
+        retry_models = ['gemini-2.5-flash', 'gemini-3.6-flash', 'gemini-3.1-pro-preview']
         
         for attempt, model in enumerate(retry_models):
             try:
                 if attempt > 0:
-                    log.info(f"🔄 [GEMINI] Retry #{attempt} с моделью {model}")
+                    wait_time = 2 * attempt  # 2s, 4s, 6s
+                    log.info(f"🔄 [GEMINI] Retry #{attempt} с моделью {model}, ждём {wait_time}с...")
+                    time.sleep(wait_time)
                     _gemini_chat = _gemini_client.chats.create(model=model, config=config)
                 
                 response = _gemini_chat.send_message(user_message)
@@ -171,6 +179,13 @@ def ask_gemini(user_message, history=None, system_prompt=None):
                     
             except Exception as e:
                 error_str = str(e)
+                error_lower = error_str.lower()
+                
+                # Проверяем на 429 Too Many Requests
+                if '429' in error_str or 'too many' in error_lower or 'rate limit' in error_lower:
+                    log.warning(f"[WARN] Rate limit (429) для {model}, ждём дольше...")
+                    time.sleep(5 * attempt)  # Ждём 5s, 10s, 15s
+                
                 log.debug(f"Retry {model} failed: {error_str[:100]}")
                 last_error = e
                 continue
