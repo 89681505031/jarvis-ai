@@ -1,0 +1,30 @@
+# === БЫСТРАЯ УСТАНОВКА VOSK ===
+
+# 1. УСТАНОВИТЕ VOSK:
+pip install vosk
+
+# 2. СКАЧАЙТЕ РУССКУЮ МОДЕЛЬ:
+#    Вариант А: Автоматически (рекомендуется)
+python -c "import os; os.makedirs('config', exist_ok=True); print('Скачайте модель вручную:')"
+
+#    Вариант Б: Вручную
+#    Перейдите: https://github.com/alibaba-damo-academy/Vosk/releases
+#    Скачайте: vosk-model-small-ru-0.22.zip
+#    Распакуйте в: C:/Users/Пользователь/Desktop/Jarvis/config/vosk-model-small-ru-0.22/
+
+# 3. ПРОВЕРКА:
+python -c "from vosk_recognition import init_vosk; print('✅ Vosk готов!' if init_vosk() else '❌ Проверьте модель')"
+
+# === РАЗМЕРЫ МОДЕЛЕЙ VOSK ===
+# - vosk-model-small-ru-0.22  ~200 МБ  (быстрая, средняя точность) ← РЕКОМЕНДУЕТСЯ
+# - vosk-model-ru-0.22        ~800 МБ  (медленная, высокая точность)
+# - vosk-model-large-ru       ~2 ГБ   (очень медленная, максимальная точность)
+
+# === ТРЕБОВАНИЯ К СИСТЕМЕ ===
+# - RAM: минимум 512 МБ (маленькая модель)
+# - CPU: любой современный
+# - Диск: 500 МБ для модели
+
+# === АЛЬТЕРНАТИВА: Если Vosk не работает ===
+# Jarvis автоматически переключится на Google Speech Recognition
+# Для Google нужен интернет!
