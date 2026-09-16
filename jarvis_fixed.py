@@ -230,20 +230,43 @@ except Exception as e:
     VOSK_OK = False
     log.warning("Vosk модуль недоступен: %s", e)
 
-# === GEMINI AI (вместо GigaChat) ===
+# === ГИБРИДНЫЙ AI: GigaChat (основной) + Gemini (резервный) ===
+GIGACHAT_OK = False
 GEMINI_OK = False
 try:
     from gemini_ai import init_gemini, is_gemini_available, get_gemini_status, ask_gemini
     GEMINI_API_KEY = "AQ.Ab8RN6JZNmnFKgsHRnWI9-riAbXaq9-XCPQn0L1VwIeWcg1WQw"
     if init_gemini(GEMINI_API_KEY):
         GEMINI_OK = True
-        log.info("✅ Gemini модуль подключён и готов к работе!")
+        log.info("✅ Gemini модуль подключён (резервный AI)")
         log.info(f"   Статус: {get_gemini_status()}")
     else:
         log.warning("⚠️ Gemini недоступен")
 except Exception as e:
     GEMINI_OK = False
     log.warning("Gemini модуль недоступен: %s", e)
+
+# === ИНИЦИАЛИЗАЦИЯ GIGACHAT (основной AI) ===
+# Настройки из config.json или env
+GIGACHAT_AUTH_KEY = os.environ.get('GIGACHAT_AUTH_KEY', '')
+if not GIGACHAT_AUTH_KEY:
+    config_path = Path(__file__).parent / 'config.json'
+    if config_path.exists():
+        try:
+            with open(config_path, 'r', encoding='utf-8') as f:
+                config = json.load(f)
+            GIGACHAT_AUTH_KEY = config.get('gigachat_auth_key', '')
+        except:
+            pass
+
+if GIGACHAT_AUTH_KEY:
+    GIGACHAT_OK = True
+    log.info("✅ GigaChat подключён (основной AI)")
+    log.info(f"   API ключ: {GIGACHAT_AUTH_KEY[:20]}...")
+else:
+    log.warning("⚠️ GigaChat не настроен (нет API ключа)")
+    log.info("   Для активации: добавьте 'gigachat_auth_key' в config.json")
+    log.info("   Или получите ключ: https://developer.sber.ru/")
 
 VOICE_MAP = {
     'приветствие': 'Джарвис - приветствие.mp3',
@@ -622,7 +645,10 @@ class JARVISUltimate(tk.Tk):
         
         # === GEMINI AI (вместо GigaChat) ===
         self.gemini_enabled = GEMINI_OK
-        log.info(f"🤖 [GEMINI] Статус: {'Активен' if GEMINI_OK else 'Неактивен'}")
+        self.gigachat_enabled = GIGACHAT_OK
+        log.info(f"🤖 [HYBRID AI] GigaChat: {'✅ Активен' if GIGACHAT_OK else '❌ Неактивен'}")
+        log.info(f"🤖 [HYBRID AI] Gemini: {'✅ Активен' if GEMINI_OK else '❌ Неактивен'}")
+        log.info(f"🤖 [HYBRID AI] Приоритет: GigaChat (основной) → Gemini (резервный)")
         
         self.apply_theme_colors()
         self.prepare_sounds_folder()
@@ -2799,7 +2825,7 @@ class JARVISUltimate(tk.Tk):
         return token
 
     def ask_gemini(self, user_message):
-        """Запрос к Gemini AI"""
+        """Гибридный запрос: GigaChat (основной) → Gemini (резервный)"""
         self._remember_user_message(user_message)
         with self._memory_lock:
             history = list(self.conversation_history[-6:])
@@ -2961,19 +2987,40 @@ class JARVISUltimate(tk.Tk):
             ""
         )
         
-        # Вызываем Gemini
-        from gemini_ai import ask_gemini as gemini_ask
+        # === ГИБРИДНЫЙ ЗАПРОС: GigaChat → Gemini ===
+        response = None
         
-        response = gemini_ask(
-            user_message,
-            history=history,
-            system_prompt=system_prompt
-        )
+        # Попытка 1: GigaChat (если включён)
+        if GIGACHAT_OK:
+            try:
+                log.info("🔄 [HYBRID] Пробуем GigaChat...")
+                response = self.ask_gigachat(user_message)
+                if response:
+                    log.info(f"✅ [HYBRID] GigaChat ответил: {len(response)} символов")
+                    return response
+            except Exception as e:
+                log.warning(f"⚠️ [HYBRID] GigaChat ошибка: {e}")
         
-        if response:
-            return response
-        else:
-            raise RuntimeError("Gemini не вернул ответ")
+        # Попытка 2: Gemini (если GigaChat не сработал)
+        if not response:
+            try:
+                log.info("🔄 [HYBRID] Пробуем Gemini...")
+                from gemini_ai import ask_gemini as gemini_ask
+                response = gemini_ask(
+                    user_message,
+                    history=history,
+                    system_prompt=system_prompt
+                )
+                if response:
+                    log.info(f"✅ [HYBRID] Gemini ответил: {len(response)} символов")
+                    return response
+            except Exception as e:
+                log.warning(f"⚠️ [HYBRID] Gemini ошибка: {e}")
+        
+        # Оба не сработали
+        if not response:
+            log.error("❌ [HYBRID] Оба AI недоступны!")
+            return "Извините, я сейчас недоступен. Проверьте подключение к интернету или попробуйте позже."
 
     def ask_gigachat(self, user_message):
         token = self._get_gigachat_token()
@@ -4238,7 +4285,12 @@ class JARVISUltimate(tk.Tk):
             open_exclude = ['что', 'как', 'расскаж', 'где', 'почему', 'про', 'ознаком', 'что такое', 'зачем', 'когда', 'знаешь', 'умеешь', 'можешь']
             has_open_question = any(kw in cmd for kw in open_exclude)
             
-            if not has_open_question and any(w in cmd for w in ['открой', 'открыть', 'запусти', 'запустить', 'включи', 'включить']) and not any(k in cmd for k in ['музык', 'песню', 'трек', 'кино', 'фильм', 'сериал', 'рутуб', 'карту', 'свет', 'видео', 'фонарик', 'экран', 'полноэкранный']):
+            # === ОТКРЫТИЕ ПРИЛОЖЕНИЙ И САЙТОВ ===
+            # Исключения: не ищем файлы на рабочем столе для веб-сайтов
+            web_sites = ['яндекс', 'google', 'youtube', 'github', 'vk', 'ютуб', 'гугл', 'вк']
+            is_web_site = any(site in cmd for site in web_sites)
+            
+            if not has_open_question and any(w in cmd for w in ['открой', 'открыть', 'запусти', 'запустить', 'включи', 'включить']) and not any(k in cmd for k in ['музык', 'песню', 'трек', 'кино', 'фильм', 'сериал', 'рутуб', 'карту', 'свет', 'видео', 'фонарик', 'экран', 'полноэкранный']) and not is_web_site:
                 target_app = cmd
                 for w in ['открой', 'открыть', 'запусти', 'запустить', 'включи', 'включить', 'приложение', 'программу', 'окно', 'джарвис', 'jarvis']:
                     target_app = target_app.replace(w, '')
@@ -5103,7 +5155,13 @@ class JARVISUltimate(tk.Tk):
             music_exclude = ['что', 'как', 'расскаж', 'где', 'почему', 'про', 'ознаком', 'что такое', 'зачем', 'когда', 'знаешь', 'умеешь', 'можешь']
             has_music_question = any(kw in cmd for kw in music_exclude)
             
-            if not has_music_question and any(k in cmd for k in ['яндекс.музык', 'яндекс музык', 'yandex.music', 'yandexmusic', 'открой музыку', 'открой яндекс', 'запусти музыку', 'запусти яндекс']):
+            # Проверяем конкретную команду на музыку
+            is_music_cmd = any(k in cmd for k in ['яндекс.музык', 'яндекс музык', 'yandex.music', 'yandexmusic', 'открой музыку', 'запусти музыку'])
+            # 'открой яндекс' без 'музыку' открывает браузер, а не музыку
+            if 'открой яндекс' in cmd and 'музык' not in cmd:
+                is_music_cmd = False
+            
+            if not has_music_question and is_music_cmd:
                 self.yandex_music_cmd('open')
             elif not has_music_question and any(k in cmd for k in ['музыку пауз', 'музыку стоп', 'пауза музыку', 'стоп музыку', 'останови музыку', 'паузу музыку']):
                 self.yandex_music_cmd('pause')
@@ -5211,18 +5269,14 @@ class JARVISUltimate(tk.Tk):
                         # Пропускаем ИИ для обработки
                         pass
                     
-                    # === ТОЛЬКО GEMINI AI (GigaChat удалён) ===
-                    if self.gemini_enabled:
-                        log.info("🤖 [GEMINI] Отправляю запрос...")
-                        raw_reply = self.ask_gemini(cmd)
-                        if raw_reply:
-                            log.info("✅ Gemini: ответ получен")
-                        else:
-                            log.warning("⚠️ [GEMINI] Не получил ответ")
-                            raw_reply = "Извините, я сейчас не могу обработать ваш запрос. Попробуйте ещё раз."
+                    # === ГИБРИДНЫЙ AI: GigaChat (основной) → Gemini (резервный) ===
+                    log.info("🤖 [HYBRID] Отправляю запрос...")
+                    raw_reply = self.ask_gemini(cmd)  # ask_gemini теперь гибридная
+                    if raw_reply:
+                        log.info("✅ AI: ответ получен")
                     else:
-                        log.error("❌ [GEMINI] Не доступен!")
-                        raw_reply = "Gemini AI недоступен. Проверьте подключение к интернету."
+                        log.warning("⚠️ [HYBRID] Не получил ответ")
+                        raw_reply = "Извините, я сейчас не могу обработать ваш запрос. Попробуйте ещё раз."
                     
                     # === ДОБАВЛЯЕМ ИМЯ ПЕРСОНАЖА К ОТВЕТУ ===
                     persona_name = self.personas.get(self.current_persona, {}).get('name', 'Jarvis')

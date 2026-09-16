@@ -14,8 +14,8 @@ if sys.stdout.encoding and sys.stdout.encoding.lower() != 'utf-8':
 # Configuration
 GITHUB_TOKEN = "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"
 GITHUB_REPO = "89681505031/jarvis-ai"
-RELEASE_TAG = "v2.0.2"
-EXE_PATH = Path("dist/JARVIS_PRO_v2.0.2.exe")
+RELEASE_TAG = "v2.0.3"
+EXE_PATH = Path("dist/JARVIS_PRO_v2.0.3.exe")
 
 def create_release():
     """Create GitHub Release and upload .exe"""
