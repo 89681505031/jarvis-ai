@@ -14,6 +14,15 @@ class PhoneCommandRouter(private val context: Context) {
     private val pm = context.packageManager
     private val allowedApps = AllowedAppStore(context)
 
+    fun canHandle(raw: String): Boolean {
+        val lower = raw.trim().lowercase(Locale("ru", "RU"))
+        return lower == "открой браузер" || lower.contains("открой браузер") ||
+            lower.contains("открой настройки") || lower.contains("открой камеру") ||
+            lower.startsWith("найди в интернете") || lower.startsWith("позвони ") ||
+            lower.contains("кто звонил") || lower.contains("пропущенные вызовы") ||
+            lower.startsWith("открой ")
+    }
+
     fun execute(raw: String): String {
         val command = raw.trim()
         val lower = command.lowercase(Locale("ru", "RU"))
