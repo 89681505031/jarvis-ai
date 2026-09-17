@@ -5,7 +5,6 @@ import android.app.Activity
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Bundle
-import android.provider.Settings
 import android.speech.RecognitionListener
 import android.speech.RecognizerIntent
 import android.speech.SpeechRecognizer
@@ -19,19 +18,23 @@ import androidx.core.content.ContextCompat
 import org.json.JSONArray
 import org.json.JSONObject
 import java.util.Locale
+import java.util.concurrent.Executors
 
 class MainActivity : Activity() {
     private lateinit var webView: WebView
     private lateinit var router: PhoneCommandRouter
+    private lateinit var gigaChat: GigaChatClient
     private var speechRecognizer: SpeechRecognizer? = null
     private var tts: TextToSpeech? = null
     private var selectedPersona = "J.A.R.V.I.S."
     private lateinit var fishAudioTts: FishAudioTts
     private val prefs by lazy { getSharedPreferences("jarvis_settings", MODE_PRIVATE) }
+    private val backgroundExecutor = Executors.newSingleThreadExecutor()
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         router = PhoneCommandRouter(this)
+        gigaChat = GigaChatClient(this)
         selectedPersona = prefs.getString("persona", "J.A.R.V.I.S.") ?: "J.A.R.V.I.S."
         fishAudioTts = FishAudioTts(this)
         tts = TextToSpeech(this) { status -> if (status == TextToSpeech.SUCCESS) tts?.language = Locale("ru", "RU") }
@@ -97,8 +100,8 @@ class MainActivity : Activity() {
         if (missing.isNotEmpty()) ActivityCompat.requestPermissions(this, missing.toTypedArray(), 100)
     }
 
-    fun openAccessibilitySettings() { startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS)) }
-    fun openNotificationSettings() { startActivity(Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS)) }
+    fun openAccessibilitySettings() { startActivity(Intent(android.provider.Settings.ACTION_ACCESSIBILITY_SETTINGS)) }
+    fun openNotificationSettings() { startActivity(Intent(android.provider.Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS)) }
 
     private fun notificationReply(): String {
         val messages = JarvisNotificationService.latest(10)
@@ -112,11 +115,26 @@ class MainActivity : Activity() {
         }.trim()
     }
 
+    private fun sendToGigaChat(text: String) {
+        backgroundExecutor.execute {
+            val answer = gigaChat.ask(text, selectedPersona)
+            runOnUiThread {
+                if (::webView.isInitialized) {
+                    val escaped = JSONObject.quote(answer)
+                    webView.evaluateJavascript("window.onGigaChatResult && window.onGigaChatResult($escaped)", null)
+                }
+                speak(answer)
+            }
+        }
+    }
+
     inner class AndroidBridge {
         @JavascriptInterface fun command(text: String): String {
             val normalized = text.trim().lowercase()
             if (normalized.contains("кто мне написал") || normalized.contains("прочитай сообщения") || normalized.contains("прочитай сообщение") || normalized.contains("новые сообщения")) return notificationReply()
-            return router.execute(text)
+            if (router.canHandle(text)) return router.execute(text)
+            sendToGigaChat(text)
+            return ""
         }
         @JavascriptInterface fun startListening() { runOnUiThread { this@MainActivity.startListening() } }
         @JavascriptInterface fun speak(text: String) { runOnUiThread { this@MainActivity.speak(text) } }
@@ -143,6 +161,6 @@ class MainActivity : Activity() {
     }
 
     override fun onDestroy() {
-        speechRecognizer?.destroy(); tts?.stop(); tts?.shutdown(); fishAudioTts.release(); webView.removeJavascriptInterface("AndroidJarvis"); webView.destroy(); super.onDestroy()
+        backgroundExecutor.shutdownNow(); speechRecognizer?.destroy(); tts?.stop(); tts?.shutdown(); fishAudioTts.release(); webView.removeJavascriptInterface("AndroidJarvis"); webView.destroy(); super.onDestroy()
     }
 }
