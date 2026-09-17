@@ -6157,6 +6157,15 @@ class JARVISUltimate(tk.Tk):
                 try:
                     subprocess.Popen(app_path, shell=True)
                     log.info("Яндекс.Музыка запущена через приложение: %s", app_path)
+                    # Авто-воспроизведение через 5 секунд
+                    def auto_play_app():
+                        time.sleep(5)
+                        try:
+                            pyautogui.press('space')
+                            log.info("Авто-воспроизведение запущено (приложение)")
+                        except:
+                            pass
+                    threading.Thread(target=auto_play_app, daemon=True).start()
                     return
                 except Exception as e:
                     log.warning("Не удалось запустить приложение: %s, открываю браузер", e)
@@ -6166,6 +6175,19 @@ class JARVISUltimate(tk.Tk):
             # Fallback — браузер
             self.add_to_dialog(msg, is_response=True)
             threading.Thread(target=action_func, daemon=True).start()
+            # Авто-воспроизведение через 4 секунды
+            def auto_play():
+                time.sleep(4)
+                try:
+                    windows = pyautogui.getWindowsWithTitle('music.yandex')
+                    if windows:
+                        windows[0].activate()
+                        time.sleep(0.5)
+                        pyautogui.press('space')
+                        log.info("Авто-воспроизведение запущено")
+                except:
+                    pass
+            threading.Thread(target=auto_play, daemon=True).start()
             return
         
         self.add_to_dialog(msg, is_response=True)
