@@ -11,15 +11,25 @@ class FishAudioTts(private val context: Context) {
     companion object {
         private const val API_URL = "https://api.fish.audio/v1/tts"
         private const val MODEL = "s2.1-pro-free"
+        private const val JARVIS_VOICE_ID = "4c3eaacc1a0545cdb0295bfddf3e3785"
         private const val ASTRA_VOICE_ID = "f6a0ee8b5fa743eca0e931405f319940"
+        private const val LUNA_VOICE_ID = "2a1036d645634680b3cc69aeeb60375b"
+        private const val CYBER_VOICE_ID = "cc1b79b1108f4ed3b8aac118ba6ebd07"
+        private const val TERRA_VOICE_ID = "c962ed46edfd419abc530d1e33a7435f"
+
         fun voiceIdFor(persona: String): String? = when (persona) {
+            "J.A.R.V.I.S." -> JARVIS_VOICE_ID
             "Astra" -> ASTRA_VOICE_ID
-            "J.A.R.V.I.S.", "Luna", "Terra", "Cyber" -> null
+            "Luna" -> LUNA_VOICE_ID
+            "Terra" -> TERRA_VOICE_ID
+            "Cyber" -> CYBER_VOICE_ID
             else -> null
         }
     }
+
     private val executor = Executors.newSingleThreadExecutor()
     private var player: MediaPlayer? = null
+
     fun speak(text: String, persona: String, onError: ((String) -> Unit)? = null) {
         val prefs = context.getSharedPreferences("jarvis_settings", Context.MODE_PRIVATE)
         val apiKey = prefs.getString("fish_api_key", "").orEmpty()
@@ -53,6 +63,7 @@ class FishAudioTts(private val context: Context) {
             } catch (e: Exception) { onError?.invoke(e.message ?: "Fish Audio request error") }
         }
     }
+
     fun release() { player?.release(); player = null; executor.shutdownNow() }
     private fun json(v: String) = "\"" + v.replace("\\", "\\\\").replace("\"", "\\\"").replace("\n", "\\n").replace("\r", "\\r") + "\""
 }
