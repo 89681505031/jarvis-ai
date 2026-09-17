@@ -5284,7 +5284,7 @@ class JARVISUltimate(tk.Tk):
             has_music_question = any(kw in cmd for kw in music_exclude)
             
             # Проверяем конкретную команду на музыку
-            is_music_cmd = any(k in cmd for k in ['яндекс.музык', 'яндекс музык', 'yandex.music', 'yandexmusic', 'открой музыку', 'запусти музыку'])
+            is_music_cmd = any(k in cmd for k in ['яндекс.музык', 'яндекс музык', 'yandex.music', 'yandexmusic', 'открой музыку', 'запусти музыку', 'включи музыку', 'запусти музыку', 'играй музыку'])
             # 'открой яндекс' без 'музыку' открывает браузер, а не музыку
             if 'открой яндекс' in cmd and 'музык' not in cmd:
                 is_music_cmd = False
@@ -6121,6 +6121,40 @@ class JARVISUltimate(tk.Tk):
         
         return None
     
+    def _find_yandex_music_window(self):
+        """Ищет окно Яндекс.Музыки (браузер или приложение) по частичному совпадению"""
+        import pyautogui
+        
+        # Ключевые слова для поиска
+        keywords = ['music.yandex', 'music.yandex.ru', 'яндекс.музык', 'yandex music', 'музык']
+        
+        # Получаем все окна
+        all_windows = pyautogui.getWindowsWithTitle('')
+        
+        for win in all_windows:
+            win_title = win.title.lower()
+            # Проверяем частичное совпадение
+            for kw in keywords:
+                if kw in win_title:
+                    return win
+        
+        # Если не нашли по названию — ищем по процессу
+        for proc in psutil.process_iter(['name', 'cmdline']):
+            try:
+                cmdline = ' '.join(proc.info.get('cmdline') or [])
+                if 'music.yandex' in cmdline.lower() or 'yandexmusic' in cmdline.lower():
+                    # Пытаемся найти окно по PID
+                    try:
+                        for win in all_windows:
+                            if win.pid == proc.pid:
+                                return win
+                    except:
+                        pass
+            except:
+                pass
+        
+        return None
+    
     def yandex_music_cmd(self, action):
         """Управление Яндекс.Музыкой — десктопное приложение или браузер"""
         if not PYAUTOGUI_OK:
@@ -6130,7 +6164,7 @@ class JARVISUltimate(tk.Tk):
         # Команды клавиш для Яндекс.Музыки (web app)
         # https://music.yandex.ru/ — использует стандартные медиа-клавиши
         commands = {
-            'open': ('Открываю Яндекс.Музыку...', 'open', lambda: (webbrowser.open("https://music.yandex.ru/"), time.sleep(3))),
+            'open': ('Открываю Яндекс.Музыку...', 'open', lambda: webbrowser.open("https://music.yandex.ru/")),
             'play': ('Воспроизвожаю...', 'play', lambda: pyautogui.press('space')),
             'pause': ('Ставлю на паузу...', 'pause', lambda: pyautogui.press('space')),
             'next': ('Следующий трек...', 'next', lambda: pyautogui.press('right')),
@@ -6157,14 +6191,20 @@ class JARVISUltimate(tk.Tk):
                 try:
                     subprocess.Popen(app_path, shell=True)
                     log.info("Яндекс.Музыка запущена через приложение: %s", app_path)
-                    # Авто-воспроизведение через 5 секунд
+                    # Авто-воспроизведение через 7 секунд (приложению нужно больше времени)
                     def auto_play_app():
-                        time.sleep(5)
+                        time.sleep(7)
                         try:
-                            pyautogui.press('space')
-                            log.info("Авто-воспроизведение запущено (приложение)")
-                        except:
-                            pass
+                            win = self._find_yandex_music_window()
+                            if win:
+                                win.activate()
+                                time.sleep(0.5)
+                                pyautogui.press('space')
+                                log.info("Авто-воспроизведение запущено (приложение)")
+                            else:
+                                log.warning("Не нашли окно приложения для авто-воспроизведения")
+                        except Exception as e:
+                            log.error("Ошибка авто-воспроизведения (приложение): %s", e)
                     threading.Thread(target=auto_play_app, daemon=True).start()
                     return
                 except Exception as e:
@@ -6174,19 +6214,22 @@ class JARVISUltimate(tk.Tk):
                 return
             # Fallback — браузер
             self.add_to_dialog(msg, is_response=True)
+            # Запускаем браузер в фоне
             threading.Thread(target=action_func, daemon=True).start()
-            # Авто-воспроизведение через 4 секунды
+            # Авто-воспроизведение через 6 секунд (браузеру нужно время для загрузки)
             def auto_play():
-                time.sleep(4)
+                time.sleep(6)
                 try:
-                    windows = pyautogui.getWindowsWithTitle('music.yandex')
-                    if windows:
-                        windows[0].activate()
+                    win = self._find_yandex_music_window()
+                    if win:
+                        win.activate()
                         time.sleep(0.5)
                         pyautogui.press('space')
-                        log.info("Авто-воспроизведение запущено")
-                except:
-                    pass
+                        log.info("Авто-воспроизведение запущено (браузер)")
+                    else:
+                        log.warning("Не нашли окно браузера для авто-воспроизведения")
+                except Exception as e:
+                    log.error("Ошибка авто-воспроизведения (браузер): %s", e)
             threading.Thread(target=auto_play, daemon=True).start()
             return
         
@@ -6194,33 +6237,14 @@ class JARVISUltimate(tk.Tk):
         
         try:
             # Пытаемся найти и активировать окно Яндекс.Музыки
-            activated = False
+            win = self._find_yandex_music_window()
             
-            # Сначала ищем десктопное приложение
-            try:
-                windows = pyautogui.getWindowsWithTitle('Яндекс.Музыка')
-                if windows:
-                    windows[0].activate()
-                    time.sleep(0.5)
-                    activated = True
-            except:
-                pass
-            
-            # Если не нашли — ищем браузер
-            if not activated:
-                try:
-                    windows = pyautogui.getWindowsWithTitle('music.yandex')
-                    if windows:
-                        windows[0].activate()
-                        time.sleep(0.5)
-                        activated = True
-                except:
-                    pass
-            
-            if not activated:
+            if not win:
                 self.add_to_dialog("⚠️ Окно Яндекс.Музыки не найдено. Откройте его вручную.", is_response=True)
                 return
             
+            win.activate()
+            time.sleep(0.5)
             action_func()
             log.info("Яндекс.Музыка: %s", action_name)
             
@@ -6257,9 +6281,9 @@ class JARVISUltimate(tk.Tk):
         elif action == 'shuffle':
             self.add_to_dialog("🔀 Включаю перемешивание...", is_response=True)
             try:
-                windows = pyautogui.getWindowsWithTitle('music.yandex')
-                if windows:
-                    windows[0].activate()
+                win = self._find_yandex_music_window()
+                if win:
+                    win.activate()
                     time.sleep(0.5)
                     pyautogui.hotkey('ctrl', 's')
             except:
@@ -6268,9 +6292,9 @@ class JARVISUltimate(tk.Tk):
         elif action == 'repeat':
             self.add_to_dialog("🔁 Включаю повтор...", is_response=True)
             try:
-                windows = pyautogui.getWindowsWithTitle('music.yandex')
-                if windows:
-                    windows[0].activate()
+                win = self._find_yandex_music_window()
+                if win:
+                    win.activate()
                     time.sleep(0.5)
                     pyautogui.hotkey('ctrl', 'r')
             except:
@@ -6279,9 +6303,9 @@ class JARVISUltimate(tk.Tk):
         elif action == 'like':
             self.add_to_dialog("❤️ Добавляю в избранное...", is_response=True)
             try:
-                windows = pyautogui.getWindowsWithTitle('music.yandex')
-                if windows:
-                    windows[0].activate()
+                win = self._find_yandex_music_window()
+                if win:
+                    win.activate()
                     time.sleep(0.5)
                     pyautogui.hotkey('ctrl', 'l')
             except:
