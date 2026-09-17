@@ -24,8 +24,13 @@
       <button id="refreshApps" class="apps-action" type="button">Обновить список</button>
     </section>
     <section id="settingsPanel" class="apps-panel" hidden>
-      <div class="apps-title">⚙️ Персонаж J.A.R.V.I.S.</div>
+      <div class="apps-title">⚙️ Настройки J.A.R.V.I.S.</div>
       <div id="personaList" class="apps-list"></div>
+      <div class="apps-title" style="margin-top:16px">🔑 API ключи</div>
+      <div class="api-field"><label for="fishApiKey">Fish Audio API Key</label><input id="fishApiKey" type="password" autocomplete="off" placeholder="Вставьте ключ Fish Audio"></div>
+      <div class="api-field"><label for="gigaApiKey">GigaChat API Key</label><input id="gigaApiKey" type="password" autocomplete="off" placeholder="Вставьте ключ GigaChat"></div>
+      <button id="saveApiKeys" class="apps-action" type="button">Сохранить API ключи</button>
+      <div id="apiStatus" class="app-empty">Ключи ещё не настроены.</div>
     </section>
     <nav class="bottom-nav">
       <button id="appsNav" type="button">⚡ Команды</button>
