@@ -8,6 +8,8 @@
     <application
         android:allowBackup="true"
         android:label="J.A.R.V.I.S."
+        android:icon="@drawable/jarvis_icon"
+        android:roundIcon="@drawable/jarvis_icon"
         android:theme="@style/Theme.JarvisPhone">
         <activity android:name=".MainActivity" android:exported="true">
             <intent-filter>
