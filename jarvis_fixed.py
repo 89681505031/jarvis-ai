@@ -6276,12 +6276,13 @@ class JARVISUltimate(tk.Tk):
         
         # Команды клавиш для Яндекс.Музыки (web app)
         # https://music.yandex.ru/ — использует стандартные медиа-клавиши
+        # ВАЖНО: right/left вызывают прокрутку в браузере, поэтому используем ctrl+right/left
         commands = {
             'open': ('Открываю Яндекс.Музыку...', 'open', lambda: webbrowser.open("https://music.yandex.ru/")),
             'play': ('Воспроизвожаю...', 'play', lambda: pyautogui.press('space')),
             'pause': ('Ставлю на паузу...', 'pause', lambda: pyautogui.press('space')),
-            'next': ('Следующий трек...', 'next', lambda: pyautogui.press('right')),
-            'prev': ('Предыдущий трек...', 'prev', lambda: pyautogui.press('left')),
+            'next': ('Следующий трек...', 'next', lambda: pyautogui.hotkey('ctrl', 'right')),
+            'prev': ('Предыдущий трек...', 'prev', lambda: pyautogui.hotkey('ctrl', 'left')),
             'volume_up': ('Громче...', 'volume_up', lambda: pyautogui.press('up')),
             'volume_down': ('Тише...', 'volume_down', lambda: pyautogui.press('down')),
             'mute': ('Без звука...', 'mute', lambda: pyautogui.press('home')),
@@ -6363,11 +6364,12 @@ class JARVISUltimate(tk.Tk):
         
         try:
             # Используем надёжную отправку клавиши
+            # Для next/prev используем ctrl+right/left чтобы не прокручивать страницу
             key_map = {
                 'play': 'space',
                 'pause': 'space',
-                'next': 'right',
-                'prev': 'left',
+                'next': 'ctrl+right',  # Комбинация клавиш
+                'prev': 'ctrl+left',   # Комбинация клавиш
                 'volume_up': 'up',
                 'volume_down': 'down',
                 'mute': 'home',
@@ -6375,11 +6377,24 @@ class JARVISUltimate(tk.Tk):
             }
             
             if action_name in key_map:
-                key = key_map[action_name]
-                if self._send_key_to_yandex_music(key):
-                    log.info("✅ Яндекс.Музыка: %s", action_name)
+                key_combo = key_map[action_name]
+                
+                # Проверяем, является ли это комбинацией клавиш (содержит '+')
+                if '+' in key_combo:
+                    # Отправляем комбинацию клавиш
+                    keys = key_combo.split('+')
+                    log.info(f"🎵 Отправка комбинации клавиш: {'+'.join(keys)}")
+                    if self._activate_yandex_music(wait_for_focus=1.5):
+                        time.sleep(0.3)
+                        import pyautogui
+                        pyautogui.hotkey(*keys)
+                        log.info(f"✅ Комбинация {'+'.join(keys)} отправлена")
                 else:
-                    self.add_to_dialog("⚠️ Не удалось отправить команду. Проверьте окно Яндекс.Музыки.", is_response=True)
+                    # Одиночная клавиша
+                    if self._send_key_to_yandex_music(key_combo):
+                        log.info("✅ Яндекс.Музыка: %s", action_name)
+                    else:
+                        self.add_to_dialog("⚠️ Не удалось отправить команду. Проверьте окно Яндекс.Музыки.", is_response=True)
             else:
                 # Для специальных команд (shuffle, repeat) используем старый метод
                 if not self._activate_yandex_music():
