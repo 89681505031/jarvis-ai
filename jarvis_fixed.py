@@ -6173,54 +6173,99 @@ class JARVISUltimate(tk.Tk):
         log.warning("Окно Яндекс.Музыки не найдено")
         return None
     
-    def _activate_yandex_music(self):
-        """Находит и активирует окно Яндекс.Музыки, возвращает True если успешно"""
+    def _activate_yandex_music(self, wait_for_focus=1.0):
+        """Находит и активирует окно Яндекс.Музыки, возвращает True если успешно
+        wait_for_focus - время ожидания установки фокуса (секунды)"""
+        import pyautogui
+        
         win = self._find_yandex_music_window()
         if not win:
             return False
         
+        log.info(f"Активация окна Яндекс.Музыки: '{win.title}'")
+        
         try:
-            # Пробуем несколько методов активации
-            # Метод 1: activate()
-            try:
-                win.activate()
-                time.sleep(0.3)
-                log.info("Окно активировано через win.activate()")
-                return True
-            except Exception as e:
-                log.debug("win.activate() не сработал: %s", e)
-            
-            # Метод 2: pyautogui.click по заголовку окна
-            try:
-                import pyautogui
-                # Получаем координаты окна
-                x = win.left + win.width // 2
-                y = win.top + 10  # Клик по заголовку
-                pyautogui.click(x, y)
-                time.sleep(0.3)
-                log.info("Окно активировано через pyautogui.click()")
-                return True
-            except Exception as e:
-                log.debug("pyautogui.click() не сработал: %s", e)
-            
-            # Метод 3: win32gui (если доступен)
+            # Метод 1: win32gui (самый надёжный для Windows)
             try:
                 import win32gui
                 import win32con
                 hwnd = win.id
-                win32gui.ShowWindow(hwnd, win32con.SW_RESTORE)
+                # Сначала восстанавливаем окно если свёрнуто
+                if win.showCmd == win32con.SW_MINIMIZE:
+                    win32gui.ShowWindow(hwnd, win32con.SW_RESTORE)
+                    time.sleep(0.3)
+                # Активируем окно
                 win32gui.SetForegroundWindow(hwnd)
-                time.sleep(0.3)
-                log.info("Окно активировано через win32gui")
+                log.info("✅ Окно активировано через win32gui.SetForegroundWindow()")
+                # Ждём установки фокуса
+                time.sleep(wait_for_focus)
                 return True
             except Exception as e:
                 log.debug("win32gui не сработал: %s", e)
             
-            log.warning("Не удалось активировать окно Яндекс.Музыки никаким методом")
+            # Метод 2: pyautogui.click по рабочей области окна
+            try:
+                # Кликаем в центр окна (не по заголовку)
+                x = win.left + win.width // 2
+                y = win.top + win.height // 2
+                pyautogui.click(x, y)
+                log.info("✅ Окно активировано через pyautogui.click() в центр окна")
+                # Ждём установки фокуса
+                time.sleep(wait_for_focus)
+                return True
+            except Exception as e:
+                log.debug("pyautogui.click() не сработал: %s", e)
+            
+            # Метод 3: activate()
+            try:
+                win.activate()
+                log.info("✅ Окно активировано через win.activate()")
+                # Ждём установки фокуса
+                time.sleep(wait_for_focus)
+                return True
+            except Exception as e:
+                log.debug("win.activate() не сработал: %s", e)
+            
+            log.warning("❌ Не удалось активировать окно Яндекс.Музыки никаким методом")
             return False
             
         except Exception as e:
             log.error("Ошибка активации окна: %s", e)
+            return False
+    
+    def _send_key_to_yandex_music(self, key, delay_after_focus=1.0):
+        """Отправляет клавишу в окно Яндекс.Музыки с надёжной проверкой фокуса
+        key - клавиша для отправки ('space', 'right', 'left', etc.)
+        delay_after_focus - дополнительное время после фокусировки"""
+        import pyautogui
+        
+        log.info(f"🎵 Отправка клавиши '{key}' в Яндекс.Музыку...")
+        
+        # Активируем окно с длительным ожиданием фокуса
+        if not self._activate_yandex_music(wait_for_focus=delay_after_focus):
+            log.error("❌ Не удалось активировать окно для отправки клавиши")
+            return False
+        
+        # Дополнительная проверка - кликаем в центр окна для гарантии фокуса
+        try:
+            win = self._find_yandex_music_window()
+            if win:
+                x = win.left + win.width // 2
+                y = win.top + win.height // 2
+                pyautogui.click(x, y)
+                time.sleep(0.3)
+                log.info("✅ Дополнительный клик для фокусировки выполнен")
+        except Exception as e:
+            log.debug("Дополнительный клик не удался: %s", e)
+        
+        # Отправляем клавишу
+        try:
+            log.info(f"Нажатие клавиши: {key}")
+            pyautogui.press(key)
+            log.info(f"✅ Клавиша '{key}' отправлена успешно")
+            return True
+        except Exception as e:
+            log.error("❌ Ошибка отправки клавиши: %s", e)
             return False
     
     def yandex_music_cmd(self, action):
@@ -6259,14 +6304,12 @@ class JARVISUltimate(tk.Tk):
                 try:
                     subprocess.Popen(app_path, shell=True)
                     log.info("Яндекс.Музыка запущена через приложение: %s", app_path)
-                    # Авто-воспроизведение через 10 секунд (приложению нужно больше времени)
+                    # Авто-воспроизведение через 12 секунд (приложению нужно больше времени)
                     def auto_play_app():
-                        time.sleep(10)
+                        time.sleep(12)
                         try:
                             log.info("Попытка авто-воспроизведения (приложение)...")
-                            if self._activate_yandex_music():
-                                time.sleep(0.5)
-                                pyautogui.press('space')
+                            if self._send_key_to_yandex_music('space', delay_after_focus=1.5):
                                 log.info("✅ Авто-воспроизведение запущено (приложение)")
                                 self.add_to_dialog("🎵 Воспроизведение началось!", is_response=True)
                             else:
@@ -6285,14 +6328,12 @@ class JARVISUltimate(tk.Tk):
             self.add_to_dialog(msg, is_response=True)
             # Запускаем браузер в фоне
             threading.Thread(target=action_func, daemon=True).start()
-            # Авто-воспроизведение через 8 секунд (браузеру нужно время для загрузки)
+            # Авто-воспроизведение через 10 секунд (браузеру нужно время для загрузки)
             def auto_play():
-                time.sleep(8)
+                time.sleep(10)
                 try:
                     log.info("Попытка авто-воспроизведения (браузер)...")
-                    if self._activate_yandex_music():
-                        time.sleep(0.5)
-                        pyautogui.press('space')
+                    if self._send_key_to_yandex_music('space', delay_after_focus=1.5):
                         log.info("✅ Авто-воспроизведение запущено (браузер)")
                         self.add_to_dialog("🎵 Воспроизведение началось!", is_response=True)
                     else:
@@ -6306,14 +6347,32 @@ class JARVISUltimate(tk.Tk):
         self.add_to_dialog(msg, is_response=True)
         
         try:
-            # Пытаемся активировать окно Яндекс.Музыки
-            if not self._activate_yandex_music():
-                self.add_to_dialog("⚠️ Окно Яндекс.Музыки не найдено или не удалось активировать. Откройте его вручную.", is_response=True)
-                return
+            # Используем надёжную отправку клавиши
+            key_map = {
+                'play': 'space',
+                'pause': 'space',
+                'next': 'right',
+                'prev': 'left',
+                'volume_up': 'up',
+                'volume_down': 'down',
+                'mute': 'home',
+                'unmute': 'home',
+            }
             
-            time.sleep(0.5)
-            action_func()
-            log.info("✅ Яндекс.Музыка: %s", action_name)
+            if action_name in key_map:
+                key = key_map[action_name]
+                if self._send_key_to_yandex_music(key):
+                    log.info("✅ Яндекс.Музыка: %s", action_name)
+                else:
+                    self.add_to_dialog("⚠️ Не удалось отправить команду. Проверьте окно Яндекс.Музыки.", is_response=True)
+            else:
+                # Для специальных команд (shuffle, repeat) используем старый метод
+                if not self._activate_yandex_music():
+                    self.add_to_dialog("⚠️ Окно Яндекс.Музыки не найдено или не удалось активировать.", is_response=True)
+                    return
+                time.sleep(0.5)
+                action_func()
+                log.info("✅ Яндекс.Музыка: %s", action_name)
             
         except Exception as e:
             log.error("Ошибка управления Яндекс.Музыкой: %s", e)
@@ -6347,19 +6406,19 @@ class JARVISUltimate(tk.Tk):
         
         elif action == 'shuffle':
             self.add_to_dialog("🔀 Включаю перемешивание...", is_response=True)
-            if self._activate_yandex_music():
+            if self._activate_yandex_music(wait_for_focus=1.0):
                 time.sleep(0.5)
                 pyautogui.hotkey('ctrl', 's')
         
         elif action == 'repeat':
             self.add_to_dialog("🔁 Включаю повтор...", is_response=True)
-            if self._activate_yandex_music():
+            if self._activate_yandex_music(wait_for_focus=1.0):
                 time.sleep(0.5)
                 pyautogui.hotkey('ctrl', 'r')
         
         elif action == 'like':
             self.add_to_dialog("❤️ Добавляю в избранное...", is_response=True)
-            if self._activate_yandex_music():
+            if self._activate_yandex_music(wait_for_focus=1.0):
                 time.sleep(0.5)
                 pyautogui.hotkey('ctrl', 'l')
         
