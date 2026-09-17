@@ -1,4 +1,4 @@
-const state={mode:'phone',persona:localStorage.getItem('jarvisPersona')||'J.A.R.V.I.S.'};
+const state={mode:'phone',persona:localStorage.getItem('jarvisPersona')||'J.A.R.V.I.S.',waitingForCommand:false};
 const message=document.getElementById('message');
 const command=document.getElementById('command');
 const send=document.getElementById('send');
@@ -33,6 +33,7 @@ function showMessage(text){message.textContent=text;}
 function sendCommand(textOverride){
   const text=(textOverride||command.value).trim();
   if(!text)return;
+  state.waitingForCommand=false;
   showMessage('Выполняю: «'+text+'»');
   if(state.mode==='phone' && window.AndroidJarvis){
     try{
@@ -48,16 +49,30 @@ function startListening(){
   if(!(window.AndroidJarvis&&typeof window.AndroidJarvis.startListening==='function')){
     showMessage('Голосовой ввод доступен в APK JARVIS.'); return;
   }
+  state.waitingForCommand=false;
   showMessage('Слушаю…');
   window.AndroidJarvis.startListening();
+}
+function listenForCommand(){
+  state.waitingForCommand=true;
+  showMessage('Слушаю…');
+  if(window.AndroidJarvis&&typeof window.AndroidJarvis.speak==='function') window.AndroidJarvis.speak('Слушаю');
+  // Start a second recognition session after the acknowledgement is spoken.
+  setTimeout(()=>{
+    if(window.AndroidJarvis&&typeof window.AndroidJarvis.startListening==='function') window.AndroidJarvis.startListening();
+  },900);
 }
 function onSpeechResult(text){
   if(!text)return;
   const clean=text.trim();
   const wake=/^(джарвис|jarvis)[,\s.!?]*/i;
+  if(state.waitingForCommand){
+    sendCommand(clean);
+    return;
+  }
   if(wake.test(clean)){
     const commandText=clean.replace(wake,'').trim();
-    if(!commandText){showMessage('Слушаю…');return;}
+    if(!commandText){listenForCommand();return;}
     sendCommand(commandText);
     return;
   }
