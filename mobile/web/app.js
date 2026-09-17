@@ -15,8 +15,20 @@ function toggleMode(){state.mode=state.mode==='phone'?'pc':'phone';render()}
 function sendCommand(){
   const text=command.value.trim();
   if(!text)return;
-  message.textContent=`Команда принята: «${text}»`;
-  // Transport to the future mobile/PC API will be connected here.
+  message.textContent='Выполняю: «'+text+'»';
+
+  if(state.mode==='phone' && window.AndroidJarvis){
+    try {
+      const result=window.AndroidJarvis.command(text);
+      message.textContent=result || 'Команда выполнена.';
+    } catch(e) {
+      message.textContent='Ошибка выполнения команды на телефоне.';
+    }
+  } else if(state.mode==='phone') {
+    message.textContent='PHONE MODE работает в приложении JARVIS. Для управления телефоном откройте APK.';
+  } else {
+    message.textContent='PC MODE: подключение к компьютеру будет следующим этапом.';
+  }
   command.value='';
 }
 modeButton.addEventListener('click',toggleMode);
