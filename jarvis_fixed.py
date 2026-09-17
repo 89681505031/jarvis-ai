@@ -5291,11 +5291,11 @@ class JARVISUltimate(tk.Tk):
             
             if not has_music_question and is_music_cmd:
                 self.yandex_music_cmd('open')
-            elif not has_music_question and any(k in cmd for k in ['музыку пауз', 'музыку стоп', 'пауза музыку', 'стоп музыку', 'останови музыку', 'паузу музыку']):
+            elif not has_music_question and any(k in cmd for k in ['музыку пауз', 'музыку стоп', 'пауза музыку', 'стоп музыку', 'останови музыку', 'паузу музыку', 'приостанови музыку', 'пауз', 'стоп музыку', 'останови']):
                 self.yandex_music_cmd('pause')
-            elif not has_music_question and any(k in cmd for k in ['музыку играть', 'музыку включи', 'продолжи музыку', 'воспроизведи музыку', 'следующий трек', 'следующую музыку', 'следующая композиц']):
+            elif not has_music_question and any(k in cmd for k in ['музыку играть', 'музыку включи', 'продолжи музыку', 'воспроизведи музыку', 'следующий трек', 'следующую музыку', 'следующая композиц', 'далее музыку', 'дальше музыку', 'следующая', 'следующий']):
                 self.yandex_music_cmd('next')
-            elif not has_music_question and any(k in cmd for k in ['предыдущий трек', 'предыдущую музыку', 'назад трек']):
+            elif not has_music_question and any(k in cmd for k in ['предыдущий трек', 'предыдущую музыку', 'назад трек', 'назад музыку', 'предыдущая', 'предыдущий', 'сначала музыку', 'заново музыку']):
                 self.yandex_music_cmd('prev')
             elif not has_music_question and any(k in cmd for k in ['громче музыку', 'громче играй', 'увеличь музыку', 'музыку громче']):
                 self.yandex_music_cmd('volume_up')
@@ -6344,7 +6344,22 @@ class JARVISUltimate(tk.Tk):
             threading.Thread(target=auto_play, daemon=True).start()
             return
         
-        self.add_to_dialog(msg, is_response=True)
+        # Сообщения для пользователя
+        messages = {
+            'pause': '⏸️ Ставлю музыку на паузу...',
+            'play': '▶️ Воспроизвожаю музыку...',
+            'next': '⏭️ Переключаю на следующий трек...',
+            'prev': '⏮️ Переключаю на предыдущий трек...',
+            'volume_up': '🔊 Делаю громче...',
+            'volume_down': '🔉 Делаю тише...',
+            'mute': '🔇 Выключаю звук...',
+            'unmute': '🔊 Включаю звук...',
+        }
+        
+        if action_name in messages:
+            self.add_to_dialog(messages[action_name], is_response=True)
+        else:
+            self.add_to_dialog(msg, is_response=True)
         
         try:
             # Используем надёжную отправку клавиши
