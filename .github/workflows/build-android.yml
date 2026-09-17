@@ -3,9 +3,16 @@ name: Build JARVIS Android APK
 on:
   workflow_dispatch:
   push:
+    branches:
+      - main
     paths:
       - 'mobile/android/**'
       - '.github/workflows/build-android.yml'
+  schedule:
+    - cron: '*/15 * * * *'
+
+permissions:
+  contents: read
 
 jobs:
   build:
@@ -37,3 +44,4 @@ jobs:
           name: jarvis-phone-debug
           path: mobile/android/app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error
+          retention-days: 7
