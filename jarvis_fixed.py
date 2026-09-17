@@ -366,7 +366,7 @@ PLUGINS = {
 }
 
 # === КОНФИГУРАЦИЯ АВТООБНОВЛЕНИЯ ===
-CURRENT_VERSION = "2.2.1"
+CURRENT_VERSION = "2.2.2"
 GITHUB_REPO = "89681505031/jarvis-ai"
 RELEASES_URL = f"https://github.com/{GITHUB_REPO}/releases"
 
