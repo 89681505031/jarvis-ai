@@ -34,18 +34,65 @@ class MainActivity : Activity() {
     }
 
     private fun requestRuntimePermissions() {
-        val permissions = mutableListOf(Manifest.permission.READ_CONTACTS, Manifest.permission.READ_CALL_LOG, Manifest.permission.CALL_PHONE, Manifest.permission.RECORD_AUDIO)
+        val permissions = mutableListOf(
+            Manifest.permission.READ_CONTACTS,
+            Manifest.permission.READ_CALL_LOG,
+            Manifest.permission.CALL_PHONE,
+            Manifest.permission.RECORD_AUDIO
+        )
         if (android.os.Build.VERSION.SDK_INT >= 33) permissions += Manifest.permission.POST_NOTIFICATIONS
-        val missing = permissions.filter { ContextCompat.checkSelfPermission(this, it) != PackageManager.PERMISSION_GRANTED }
+        val missing = permissions.filter {
+            ContextCompat.checkSelfPermission(this, it) != PackageManager.PERMISSION_GRANTED
+        }
         if (missing.isNotEmpty()) ActivityCompat.requestPermissions(this, missing.toTypedArray(), 100)
     }
 
-    fun openAccessibilitySettings() { startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS)) }
+    fun openAccessibilitySettings() {
+        startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS))
+    }
+
+    fun openNotificationSettings() {
+        startActivity(Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS))
+    }
+
+    private fun notificationReply(): String {
+        val messages = JarvisNotificationService.latest(10)
+        if (messages.isEmpty()) {
+            return "Пока нет новых сообщений в уведомлениях WhatsApp или Telegram. Проверьте, что доступ к уведомлениям J.A.R.V.I.S. включён."
+        }
+        return buildString {
+            append("Последние сообщения:\n")
+            messages.forEach { message ->
+                val appName = when (message.packageName) {
+                    JarvisNotificationService.WHATSAPP -> "WhatsApp"
+                    JarvisNotificationService.TELEGRAM -> "Telegram"
+                    else -> message.packageName
+                }
+                append("• ").append(appName)
+                if (message.title.isNotBlank()) append(" — ").append(message.title)
+                if (message.text.isNotBlank()) append(": ").append(message.text)
+                append('\n')
+            }
+        }.trim()
+    }
 
     inner class AndroidBridge {
-        @JavascriptInterface fun command(text: String): String = router.execute(text)
+        @JavascriptInterface
+        fun command(text: String): String {
+            val normalized = text.trim().lowercase()
+            if (
+                normalized.contains("кто мне написал") ||
+                normalized.contains("прочитай сообщения") ||
+                normalized.contains("прочитай сообщение") ||
+                normalized.contains("новые сообщения")
+            ) {
+                return notificationReply()
+            }
+            return router.execute(text)
+        }
 
-        @JavascriptInterface fun listApps(): String {
+        @JavascriptInterface
+        fun listApps(): String {
             val array = JSONArray()
             router.launcherApps().forEach {
                 array.put(JSONObject().apply {
@@ -57,17 +104,36 @@ class MainActivity : Activity() {
             return array.toString()
         }
 
-        @JavascriptInterface fun setAppAllowed(packageName: String, allowed: Boolean): String {
+        @JavascriptInterface
+        fun setAppAllowed(packageName: String, allowed: Boolean): String {
             router.setAppAllowed(packageName, allowed)
             return if (allowed) "Приложение добавлено в JARVIS." else "Приложение удалено из JARVIS."
         }
 
-        @JavascriptInterface fun enableAccessibility(): String {
+        @JavascriptInterface
+        fun enableAccessibility(): String {
             openAccessibilitySettings()
             return "Откройте J.A.R.V.I.S. в специальных возможностях Android и включите доступ."
         }
 
-        @JavascriptInterface fun toast(text: String) { runOnUiThread { Toast.makeText(this@MainActivity, text, Toast.LENGTH_SHORT).show() } }
+        @JavascriptInterface
+        fun enableNotifications(): String {
+            openNotificationSettings()
+            return "Откройте доступ к уведомлениям для J.A.R.V.I.S. и вернитесь в приложение."
+        }
+
+        @JavascriptInterface
+        fun clearMessages(): String {
+            JarvisNotificationService.clear()
+            return "История уведомлений J.A.R.V.I.S. очищена."
+        }
+
+        @JavascriptInterface
+        fun toast(text: String) {
+            runOnUiThread {
+                Toast.makeText(this@MainActivity, text, Toast.LENGTH_SHORT).show()
+            }
+        }
     }
 
     override fun onDestroy() {
