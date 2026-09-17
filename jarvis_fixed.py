@@ -6276,13 +6276,14 @@ class JARVISUltimate(tk.Tk):
         
         # Команды клавиш для Яндекс.Музыки (web app)
         # https://music.yandex.ru/ — использует стандартные медиа-клавиши
-        # ВАЖНО: right/left вызывают прокрутку в браузере, поэтому используем ctrl+right/left
+        # ВАЖНО: right/left и ctrl+right/left вызывают прокрутку в браузере
+        # Правильные клавиши Яндекс.Музыки: N=следующий, P=предыдущий, Space=пауза
         commands = {
             'open': ('Открываю Яндекс.Музыку...', 'open', lambda: webbrowser.open("https://music.yandex.ru/")),
             'play': ('Воспроизвожаю...', 'play', lambda: pyautogui.press('space')),
             'pause': ('Ставлю на паузу...', 'pause', lambda: pyautogui.press('space')),
-            'next': ('Следующий трек...', 'next', lambda: pyautogui.hotkey('ctrl', 'right')),
-            'prev': ('Предыдущий трек...', 'prev', lambda: pyautogui.hotkey('ctrl', 'left')),
+            'next': ('Следующий трек...', 'next', lambda: pyautogui.press('n')),
+            'prev': ('Предыдущий трек...', 'prev', lambda: pyautogui.press('p')),
             'volume_up': ('Громче...', 'volume_up', lambda: pyautogui.press('up')),
             'volume_down': ('Тише...', 'volume_down', lambda: pyautogui.press('down')),
             'mute': ('Без звука...', 'mute', lambda: pyautogui.press('home')),
@@ -6364,12 +6365,13 @@ class JARVISUltimate(tk.Tk):
         
         try:
             # Используем надёжную отправку клавиши
-            # Для next/prev используем ctrl+right/left чтобы не прокручивать страницу
+            # Правильные горячие клавиши Яндекс.Музыки:
+            # N = следующий трек, P = предыдущий трек, Space = пауза
             key_map = {
                 'play': 'space',
                 'pause': 'space',
-                'next': 'ctrl+right',  # Комбинация клавиш
-                'prev': 'ctrl+left',   # Комбинация клавиш
+                'next': 'n',  # Клавиша N для следующего трека
+                'prev': 'p',  # Клавиша P для предыдущего трека
                 'volume_up': 'up',
                 'volume_down': 'down',
                 'mute': 'home',
