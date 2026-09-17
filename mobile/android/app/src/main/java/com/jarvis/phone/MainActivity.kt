@@ -26,13 +26,15 @@ class MainActivity : Activity() {
     private var speechRecognizer: SpeechRecognizer? = null
     private var tts: TextToSpeech? = null
     private var selectedPersona = "J.A.R.V.I.S."
+    private lateinit var fishAudioTts: FishAudioTts
+    private val prefs by lazy { getSharedPreferences("jarvis_settings", MODE_PRIVATE) }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         router = PhoneCommandRouter(this)
-        tts = TextToSpeech(this) { status ->
-            if (status == TextToSpeech.SUCCESS) tts?.language = Locale("ru", "RU")
-        }
+        selectedPersona = prefs.getString("persona", "J.A.R.V.I.S.") ?: "J.A.R.V.I.S."
+        fishAudioTts = FishAudioTts(this)
+        tts = TextToSpeech(this) { status -> if (status == TextToSpeech.SUCCESS) tts?.language = Locale("ru", "RU") }
         setupSpeechRecognizer()
         webView = WebView(this).apply {
             settings.javaScriptEnabled = true
@@ -56,9 +58,7 @@ class MainActivity : Activity() {
             override fun onEndOfSpeech() = Unit
             override fun onPartialResults(partialResults: Bundle?) = Unit
             override fun onEvent(eventType: Int, params: Bundle?) = Unit
-            override fun onError(error: Int) {
-                runOnUiThread { webView.evaluateJavascript("window.onJarvisSpeechResult && window.onJarvisSpeechResult('')", null) }
-            }
+            override fun onError(error: Int) { runOnUiThread { webView.evaluateJavascript("window.onJarvisSpeechResult && window.onJarvisSpeechResult('')", null) } }
             override fun onResults(results: Bundle?) {
                 val text = results?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)?.firstOrNull() ?: return
                 val escaped = JSONObject.quote(text)
@@ -68,14 +68,8 @@ class MainActivity : Activity() {
     }
 
     private fun startListening() {
-        if (ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {
-            requestRuntimePermissions()
-            return
-        }
-        if (speechRecognizer == null) {
-            Toast.makeText(this, "Голосовой ввод недоступен на этом устройстве.", Toast.LENGTH_SHORT).show()
-            return
-        }
+        if (ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) { requestRuntimePermissions(); return }
+        if (speechRecognizer == null) { Toast.makeText(this, "Голосовой ввод недоступен на этом устройстве.", Toast.LENGTH_SHORT).show(); return }
         val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
             putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
             putExtra(RecognizerIntent.EXTRA_LANGUAGE, "ru-RU")
@@ -87,125 +81,68 @@ class MainActivity : Activity() {
 
     private fun speak(text: String) {
         if (text.isBlank()) return
-        tts?.speak(text, TextToSpeech.QUEUE_FLUSH, null, "jarvis-response")
+        val apiKey = prefs.getString("fish_api_key", "").orEmpty()
+        val fishVoice = FishAudioTts.voiceIdFor(selectedPersona)
+        if (apiKey.isNotBlank() && !fishVoice.isNullOrBlank()) {
+            fishAudioTts.speak(text, selectedPersona) { runOnUiThread { tts?.speak(text, TextToSpeech.QUEUE_FLUSH, null, "jarvis-response-fallback") } }
+        } else {
+            tts?.speak(text, TextToSpeech.QUEUE_FLUSH, null, "jarvis-response")
+        }
     }
 
     private fun requestRuntimePermissions() {
-        val permissions = mutableListOf(
-            Manifest.permission.READ_CONTACTS,
-            Manifest.permission.READ_CALL_LOG,
-            Manifest.permission.CALL_PHONE,
-            Manifest.permission.RECORD_AUDIO
-        )
+        val permissions = mutableListOf(Manifest.permission.READ_CONTACTS, Manifest.permission.READ_CALL_LOG, Manifest.permission.CALL_PHONE, Manifest.permission.RECORD_AUDIO)
         if (android.os.Build.VERSION.SDK_INT >= 33) permissions += Manifest.permission.POST_NOTIFICATIONS
-        val missing = permissions.filter {
-            ContextCompat.checkSelfPermission(this, it) != PackageManager.PERMISSION_GRANTED
-        }
+        val missing = permissions.filter { ContextCompat.checkSelfPermission(this, it) != PackageManager.PERMISSION_GRANTED }
         if (missing.isNotEmpty()) ActivityCompat.requestPermissions(this, missing.toTypedArray(), 100)
     }
 
-    fun openAccessibilitySettings() {
-        startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS))
-    }
-
-    fun openNotificationSettings() {
-        startActivity(Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS))
-    }
+    fun openAccessibilitySettings() { startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS)) }
+    fun openNotificationSettings() { startActivity(Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS)) }
 
     private fun notificationReply(): String {
         val messages = JarvisNotificationService.latest(10)
-        if (messages.isEmpty()) {
-            return "Пока нет новых сообщений в уведомлениях WhatsApp или Telegram. Проверьте, что доступ к уведомлениям J.A.R.V.I.S. включён."
-        }
+        if (messages.isEmpty()) return "Пока нет новых сообщений в уведомлениях WhatsApp или Telegram. Проверьте, что доступ к уведомлениям J.A.R.V.I.S. включён."
         return buildString {
             append("Последние сообщения:\n")
             messages.forEach { message ->
-                val appName = when (message.packageName) {
-                    JarvisNotificationService.WHATSAPP -> "WhatsApp"
-                    JarvisNotificationService.TELEGRAM -> "Telegram"
-                    else -> message.packageName
-                }
-                append("• ").append(appName)
-                if (message.title.isNotBlank()) append(" — ").append(message.title)
-                if (message.text.isNotBlank()) append(": ").append(message.text)
-                append('\n')
+                val appName = when (message.packageName) { JarvisNotificationService.WHATSAPP -> "WhatsApp"; JarvisNotificationService.TELEGRAM -> "Telegram"; else -> message.packageName }
+                append("• ").append(appName); if (message.title.isNotBlank()) append(" — ").append(message.title); if (message.text.isNotBlank()) append(": ").append(message.text); append('\n')
             }
         }.trim()
     }
 
     inner class AndroidBridge {
-        @JavascriptInterface
-        fun command(text: String): String {
+        @JavascriptInterface fun command(text: String): String {
             val normalized = text.trim().lowercase()
-            if (
-                normalized.contains("кто мне написал") ||
-                normalized.contains("прочитай сообщения") ||
-                normalized.contains("прочитай сообщение") ||
-                normalized.contains("новые сообщения")
-            ) {
-                return notificationReply()
-            }
+            if (normalized.contains("кто мне написал") || normalized.contains("прочитай сообщения") || normalized.contains("прочитай сообщение") || normalized.contains("новые сообщения")) return notificationReply()
             return router.execute(text)
         }
-
-        @JavascriptInterface
-        fun startListening() { runOnUiThread { this@MainActivity.startListening() } }
-
-        @JavascriptInterface
-        fun speak(text: String) { runOnUiThread { this@MainActivity.speak(text) } }
-
-        @JavascriptInterface
-        fun setPersona(name: String) { selectedPersona = name }
-
-        @JavascriptInterface
-        fun listApps(): String {
-            val array = JSONArray()
-            router.launcherApps().forEach {
-                array.put(JSONObject().apply {
-                    put("label", it.label)
-                    put("packageName", it.packageName)
-                    put("allowed", router.isAppAllowed(it.packageName))
-                })
-            }
-            return array.toString()
+        @JavascriptInterface fun startListening() { runOnUiThread { this@MainActivity.startListening() } }
+        @JavascriptInterface fun speak(text: String) { runOnUiThread { this@MainActivity.speak(text) } }
+        @JavascriptInterface fun setPersona(name: String) { selectedPersona = name; prefs.edit().putString("persona", name).apply() }
+        @JavascriptInterface fun setApiKeys(fish: String, giga: String): String {
+            val editor = prefs.edit()
+            if (fish.isNotBlank()) editor.putString("fish_api_key", fish)
+            if (giga.isNotBlank()) editor.putString("gigachat_api_key", giga)
+            editor.apply()
+            return "Fish Audio: ${if (fish.isNotBlank() || prefs.getString("fish_api_key", "").orEmpty().isNotBlank()) "✓ настроен" else "не настроен"} · GigaChat: ${if (giga.isNotBlank() || prefs.getString("gigachat_api_key", "").orEmpty().isNotBlank()) "✓ настроен" else "не настроен"}"
         }
-
-        @JavascriptInterface
-        fun setAppAllowed(packageName: String, allowed: Boolean): String {
-            router.setAppAllowed(packageName, allowed)
-            return if (allowed) "Приложение добавлено в JARVIS." else "Приложение удалено из JARVIS."
+        @JavascriptInterface fun getApiKeyStatus(): String = JSONObject().apply {
+            put("fish", prefs.getString("fish_api_key", "").orEmpty().isNotBlank())
+            put("giga", prefs.getString("gigachat_api_key", "").orEmpty().isNotBlank())
+        }.toString()
+        @JavascriptInterface fun listApps(): String {
+            val array = JSONArray(); router.launcherApps().forEach { array.put(JSONObject().apply { put("label", it.label); put("packageName", it.packageName); put("allowed", router.isAppAllowed(it.packageName)) }) }; return array.toString()
         }
-
-        @JavascriptInterface
-        fun enableAccessibility(): String {
-            openAccessibilitySettings()
-            return "Откройте J.A.R.V.I.S. в специальных возможностях Android и включите доступ."
-        }
-
-        @JavascriptInterface
-        fun enableNotifications(): String {
-            openNotificationSettings()
-            return "Откройте доступ к уведомлениям для J.A.R.V.I.S. и вернитесь в приложение."
-        }
-
-        @JavascriptInterface
-        fun clearMessages(): String {
-            JarvisNotificationService.clear()
-            return "История уведомлений J.A.R.V.I.S. очищена."
-        }
-
-        @JavascriptInterface
-        fun toast(text: String) {
-            runOnUiThread { Toast.makeText(this@MainActivity, text, Toast.LENGTH_SHORT).show() }
-        }
+        @JavascriptInterface fun setAppAllowed(packageName: String, allowed: Boolean): String { router.setAppAllowed(packageName, allowed); return if (allowed) "Приложение добавлено в JARVIS." else "Приложение удалено из JARVIS." }
+        @JavascriptInterface fun enableAccessibility(): String { openAccessibilitySettings(); return "Откройте J.A.R.V.I.S. в специальных возможностях Android и включите доступ." }
+        @JavascriptInterface fun enableNotifications(): String { openNotificationSettings(); return "Откройте доступ к уведомлениям для J.A.R.V.I.S. и вернитесь в приложение." }
+        @JavascriptInterface fun clearMessages(): String { JarvisNotificationService.clear(); return "История уведомлений J.A.R.V.I.S. очищена." }
+        @JavascriptInterface fun toast(text: String) { runOnUiThread { Toast.makeText(this@MainActivity, text, Toast.LENGTH_SHORT).show() } }
     }
 
     override fun onDestroy() {
-        speechRecognizer?.destroy()
-        tts?.stop()
-        tts?.shutdown()
-        webView.removeJavascriptInterface("AndroidJarvis")
-        webView.destroy()
-        super.onDestroy()
+        speechRecognizer?.destroy(); tts?.stop(); tts?.shutdown(); fishAudioTts.release(); webView.removeJavascriptInterface("AndroidJarvis"); webView.destroy(); super.onDestroy()
     }
 }
