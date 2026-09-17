@@ -15,6 +15,20 @@ import queue
 from pathlib import Path
 from datetime import datetime, timedelta
 
+# Windows API для отправки клавиш напрямую в окно
+try:
+    import win32gui
+    import win32con
+    HAS_WIN32 = True
+except ImportError:
+    HAS_WIN32 = False
+
+try:
+    import ctypes
+    HAS_CTYPES = True
+except ImportError:
+    HAS_CTYPES = False
+
 # ---------------------------------------------------------------------------
 # Логирование — вместо print()
 # ---------------------------------------------------------------------------
@@ -6186,22 +6200,23 @@ class JARVISUltimate(tk.Tk):
         
         try:
             # Метод 1: win32gui (самый надёжный для Windows)
-            try:
-                import win32gui
-                import win32con
-                hwnd = win.id
-                # Сначала восстанавливаем окно если свёрнуто
-                if win.showCmd == win32con.SW_MINIMIZE:
-                    win32gui.ShowWindow(hwnd, win32con.SW_RESTORE)
-                    time.sleep(0.3)
-                # Активируем окно
-                win32gui.SetForegroundWindow(hwnd)
-                log.info("✅ Окно активировано через win32gui.SetForegroundWindow()")
-                # Ждём установки фокуса
-                time.sleep(wait_for_focus)
-                return True
-            except Exception as e:
-                log.debug("win32gui не сработал: %s", e)
+            if HAS_WIN32:
+                try:
+                    import win32gui
+                    import win32con
+                    hwnd = win.id
+                    # Сначала восстанавливаем окно если свёрнуто
+                    if hasattr(win, 'showCmd') and win.showCmd == win32con.SW_MINIMIZE:
+                        win32gui.ShowWindow(hwnd, win32con.SW_RESTORE)
+                        time.sleep(0.3)
+                    # Активируем окно
+                    win32gui.SetForegroundWindow(hwnd)
+                    log.info("✅ Окно активировано через win32gui.SetForegroundWindow()")
+                    # Ждём установки фокуса
+                    time.sleep(wait_for_focus)
+                    return True
+                except Exception as e:
+                    log.debug("win32gui не сработал: %s", e)
             
             # Метод 2: pyautogui.click по рабочей области окна
             try:
@@ -6233,39 +6248,90 @@ class JARVISUltimate(tk.Tk):
             log.error("Ошибка активации окна: %s", e)
             return False
     
-    def _send_key_to_yandex_music(self, key, delay_after_focus=1.0):
+    def _send_key_to_yandex_music(self, key, delay_after_focus=1.5):
         """Отправляет клавишу в окно Яндекс.Музыки с надёжной проверкой фокуса
-        key - клавиша для отправки ('space', 'right', 'left', etc.)
+        key - клавиша для отправки ('space', 'n', 'p', etc.)
         delay_after_focus - дополнительное время после фокусировки"""
         import pyautogui
         
         log.info(f"🎵 Отправка клавиши '{key}' в Яндекс.Музыку...")
         
-        # Активируем окно с длительным ожиданием фокуса
-        if not self._activate_yandex_music(wait_for_focus=delay_after_focus):
-            log.error("❌ Не удалось активировать окно для отправки клавиши")
+        # Находим окно
+        win = self._find_yandex_music_window()
+        if not win:
+            log.error("❌ Окно Яндекс.Музыки не найдено")
             return False
         
-        # Дополнительная проверка - кликаем в центр окна для гарантии фокуса
+        log.info(f"Найдено окно: '{win.title}'")
+        
         try:
-            win = self._find_yandex_music_window()
-            if win:
+            # Метод 1: Пробуем через win32api.SendMessage (самый надёжный)
+            if HAS_WIN32 and HAS_CTYPES:
+                try:
+                    hwnd = win.id
+                    
+                    # Восстанавливаем окно если свёрнуто
+                    if hasattr(win, 'showCmd') and win.showCmd == win32con.SW_MINIMIZE:
+                        win32gui.ShowWindow(hwnd, win32con.SW_RESTORE)
+                        time.sleep(0.3)
+                    
+                    # Активируем окно
+                    win32gui.SetForegroundWindow(hwnd)
+                    time.sleep(0.5)
+                    
+                    # Кликаем в центр окна через win32api
+                    x = win.left + win.width // 2
+                    y = win.top + win.height // 2
+                    lparam = y << 16 | x
+                    win32gui.PostMessage(hwnd, win32con.WM_LBUTTONDOWN, win32con.MK_LBUTTON, lparam)
+                    time.sleep(0.1)
+                    win32gui.PostMessage(hwnd, win32con.WM_LBUTTONUP, 0, lparam)
+                    time.sleep(0.5)
+                    
+                    log.info("✅ Окно активировано через win32api")
+                    
+                    # Используем SendMessage для отправки клавиши
+                    vkey = ctypes.windll.user32.VkKeyScanW(ord(key.upper())) & 0xFF
+                    lparam_data = ctypes.c_ulong(1).value  # repeat count
+                    lparam_data |= 0  # previous key state
+                    lparam_data |= 0 << 16  # transition state
+                    
+                    ctypes.windll.user32.SendMessageW(
+                        hwnd, win32con.WM_KEYDOWN, vkey, lparam_data
+                    )
+                    time.sleep(0.05)
+                    ctypes.windll.user32.SendMessageW(
+                        hwnd, win32con.WM_KEYUP, vkey, lparam_data | (1 << 30)
+                    )
+                    
+                    log.info(f"✅ Клавиша '{key}' отправлена через SendMessage")
+                    return True
+                    
+                except Exception as e:
+                    log.debug("win32api/postmessage не сработал: %s", e)
+            
+            # Метод 2: pyautogui.click + press с долгим ожиданием
+            try:
+                # Кликаем в центр окна
                 x = win.left + win.width // 2
                 y = win.top + win.height // 2
                 pyautogui.click(x, y)
+                time.sleep(1.5)  # Долгое ожидание для установки фокуса
+                
+                # Отправляем клавишу
+                pyautogui.press(key)
                 time.sleep(0.3)
-                log.info("✅ Дополнительный клик для фокусировки выполнен")
+                
+                log.info("✅ Клавиша отправлена через pyautogui")
+                return True
+            except Exception as e:
+                log.debug("pyautogui не сработал: %s", e)
+            
+            log.error("❌ Не удалось отправить клавишу в Яндекс.Музыку")
+            return False
+            
         except Exception as e:
-            log.debug("Дополнительный клик не удался: %s", e)
-        
-        # Отправляем клавишу
-        try:
-            log.info(f"Нажатие клавиши: {key}")
-            pyautogui.press(key)
-            log.info(f"✅ Клавиша '{key}' отправлена успешно")
-            return True
-        except Exception as e:
-            log.error("❌ Ошибка отправки клавиши: %s", e)
+            log.error("Ошибка отправки клавиши: %s", e)
             return False
     
     def yandex_music_cmd(self, action):
