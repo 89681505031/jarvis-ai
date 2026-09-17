@@ -42,8 +42,8 @@ function sendCommand(textOverride){
   if(state.mode==='phone' && window.AndroidJarvis){
     try{
       const result=window.AndroidJarvis.command(text);
-      showMessage(result||'Команда выполнена.');
-      if(typeof window.AndroidJarvis.speak==='function') window.AndroidJarvis.speak(result||'Команда выполнена.');
+      if(result){showMessage(result);if(typeof window.AndroidJarvis.speak==='function') window.AndroidJarvis.speak(result)}
+      else showMessage('Думаю…');
     }catch(e){showMessage('Ошибка выполнения команды на телефоне.')}
   }else if(state.mode==='phone') showMessage('PHONE MODE работает в APK JARVIS.');
   else showMessage('PC MODE: подключение к компьютеру будет следующим этапом.');
@@ -60,11 +60,13 @@ function listenForCommand(){
 }
 function onSpeechResult(text){
   if(!text)return; const clean=text.trim(); const wake=/^(джарвис|jarvis)[,\s.!?]*/i;
-  if(state.waitingForCommand){sendCommand(clean);return;}
+  if(state.waitingForCommand){sendCommand(clean);return}
   if(wake.test(clean)){const commandText=clean.replace(wake,'').trim();if(!commandText){listenForCommand();return}sendCommand(commandText);return}
   sendCommand(clean);
 }
+function onGigaChatResult(text){showMessage(text||'GigaChat не вернул ответ.');}
 window.onJarvisSpeechResult=onSpeechResult;
+window.onGigaChatResult=onGigaChatResult;
 function loadApps(){
   if(!(window.AndroidJarvis&&typeof window.AndroidJarvis.listApps==='function')){appsList.innerHTML='<div class="app-empty">Список приложений доступен внутри APK JARVIS.</div>';return}
   try{const apps=JSON.parse(window.AndroidJarvis.listApps());appsList.innerHTML='';apps.forEach(app=>{const row=document.createElement('label');row.className='app-row';row.innerHTML='<span>'+app.label+'</span><input type="checkbox" '+(app.allowed?'checked':'')+'>';row.querySelector('input').addEventListener('change',e=>{showMessage(window.AndroidJarvis.setAppAllowed(app.packageName,e.target.checked))});appsList.appendChild(row)});if(!apps.length)appsList.innerHTML='<div class="app-empty">Приложения не найдены.</div>'}catch(e){appsList.innerHTML='<div class="app-empty">Не удалось загрузить приложения.</div>'}
