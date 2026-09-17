@@ -6347,18 +6347,18 @@ class JARVISUltimate(tk.Tk):
         
         # Команды клавиш для Яндекс.Музыки (web app)
         # https://music.yandex.ru/ — использует стандартные медиа-клавиши
-        # ВАЖНО: right/left и ctrl+right/left вызывают прокрутку в браузере
-        # Правильные клавиши Яндекс.Музыки: N=следующий, P=предыдущий, Space=пауза
+        # ВАЖНО: Правильные клавиши Яндекс.Музыки:
+        # P = play/pause, N = следующий, M = предыдущий (не P!)
         commands = {
             'open': ('Открываю Яндекс.Музыку...', 'open', lambda: webbrowser.open("https://music.yandex.ru/")),
-            'play': ('Воспроизвожаю...', 'play', lambda: pyautogui.press('space')),
-            'pause': ('Ставлю на паузу...', 'pause', lambda: pyautogui.press('space')),
+            'play': ('Воспроизвожаю...', 'play', lambda: pyautogui.press('p')),
+            'pause': ('Ставлю на паузу...', 'pause', lambda: pyautogui.press('p')),
             'next': ('Следующий трек...', 'next', lambda: pyautogui.press('n')),
-            'prev': ('Предыдущий трек...', 'prev', lambda: pyautogui.press('p')),
+            'prev': ('Предыдущий трек...', 'prev', lambda: pyautogui.press('m')),
             'volume_up': ('Громче...', 'volume_up', lambda: pyautogui.press('up')),
             'volume_down': ('Тише...', 'volume_down', lambda: pyautogui.press('down')),
-            'mute': ('Без звука...', 'mute', lambda: pyautogui.press('home')),
-            'unmute': ('Включаю звук...', 'unmute', lambda: pyautogui.press('home')),
+            'mute': ('Без звука...', 'mute', lambda: pyautogui.press('m')),
+            'unmute': ('Включаю звук...', 'unmute', lambda: pyautogui.press('m')),
             'repeat': ('Повтор...', 'repeat', lambda: pyautogui.hotkey('ctrl', 'r')),
             'shuffle': ('Перемешать...', 'shuffle', lambda: pyautogui.hotkey('ctrl', 's')),
         }
@@ -6382,12 +6382,12 @@ class JARVISUltimate(tk.Tk):
                         time.sleep(12)
                         try:
                             log.info("Попытка авто-воспроизведения (приложение)...")
-                            if self._send_key_to_yandex_music('space', delay_after_focus=1.5):
+                            if self._send_key_to_yandex_music('p', delay_after_focus=1.5):
                                 log.info("✅ Авто-воспроизведение запущено (приложение)")
                                 self.add_to_dialog("🎵 Воспроизведение началось!", is_response=True)
                             else:
                                 log.warning("Не удалось активировать окно для авто-воспроизведения (приложение)")
-                                self.add_to_dialog("⚠️ Не удалось активировать окно Яндекс.Музыки. Нажмите пробел вручную.", is_response=True)
+                                self.add_to_dialog("⚠️ Не удалось активировать окно Яндекс.Музыки. Нажмите P вручную.", is_response=True)
                         except Exception as e:
                             log.error("Ошибка авто-воспроизведения (приложение): %s", e)
                     threading.Thread(target=auto_play_app, daemon=True).start()
@@ -6406,12 +6406,12 @@ class JARVISUltimate(tk.Tk):
                 time.sleep(10)
                 try:
                     log.info("Попытка авто-воспроизведения (браузер)...")
-                    if self._send_key_to_yandex_music('space', delay_after_focus=1.5):
+                    if self._send_key_to_yandex_music('p', delay_after_focus=1.5):
                         log.info("✅ Авто-воспроизведение запущено (браузер)")
                         self.add_to_dialog("🎵 Воспроизведение началось!", is_response=True)
                     else:
                         log.warning("Не удалось активировать окно для авто-воспроизведения (браузер)")
-                        self.add_to_dialog("⚠️ Не удалось активировать окно Яндекс.Музыки. Нажмите пробел вручную.", is_response=True)
+                        self.add_to_dialog("⚠️ Не удалось активировать окно Яндекс.Музыки. Нажмите P вручную.", is_response=True)
                 except Exception as e:
                     log.error("Ошибка авто-воспроизведения (браузер): %s", e)
             threading.Thread(target=auto_play, daemon=True).start()
@@ -6437,16 +6437,16 @@ class JARVISUltimate(tk.Tk):
         try:
             # Используем надёжную отправку клавиши
             # Правильные горячие клавиши Яндекс.Музыки:
-            # N = следующий трек, P = предыдущий трек, Space = пауза
+            # P = play/pause, N = следующий трек, M = предыдущий/ mute
             key_map = {
-                'play': 'space',
-                'pause': 'space',
-                'next': 'n',  # Клавиша N для следующего трека
-                'prev': 'p',  # Клавиша P для предыдущего трека
+                'play': 'p',
+                'pause': 'p',
+                'next': 'n',
+                'prev': 'm',
                 'volume_up': 'up',
                 'volume_down': 'down',
-                'mute': 'home',
-                'unmute': 'home',
+                'mute': 'm',
+                'unmute': 'm',
             }
             
             if action_name in key_map:
