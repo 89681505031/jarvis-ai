@@ -13,7 +13,7 @@
       <div><div class="brand">J.A.R.V.I.S.</div><div id="status" class="status">● ONLINE</div></div>
       <button id="modeButton" class="mode" type="button">📱 PHONE MODE</button>
     </header>
-    <section class="orb-wrap" aria-label="JARVIS status"><div class="orb"><span></span></div></section>
+    <section id="orbButton" class="orb-wrap" aria-label="JARVIS status" role="button" tabindex="0"><div class="orb"><span></span></div></section>
     <section class="panel">
       <div id="message" class="message">Готов к работе, сэр.</div>
       <div class="input-row"><input id="command" autocomplete="off" placeholder="Что прикажете?"><button id="send" type="button">➤</button></div>
@@ -23,11 +23,19 @@
       <div id="appsList" class="apps-list"></div>
       <button id="refreshApps" class="apps-action" type="button">Обновить список</button>
     </section>
+    <section id="settingsPanel" class="apps-panel" hidden>
+      <div class="apps-title">⚙️ Настройки J.A.R.V.I.S.</div>
+      <div id="personaList" class="apps-list"></div>
+      <div class="apps-title" style="margin-top:16px">🔑 API ключи</div>
+      <div class="api-field"><label for="fishApiKey">Fish Audio API Key</label><input id="fishApiKey" type="password" autocomplete="off" placeholder="Вставьте ключ Fish Audio"></div>
+      <div class="api-field"><label for="gigaApiKey">GigaChat API Key</label><input id="gigaApiKey" type="password" autocomplete="off" placeholder="Вставьте ключ GigaChat"></div>
+      <button id="saveApiKeys" class="apps-action" type="button">Сохранить API ключи</button>
+      <div id="apiStatus" class="app-empty">Ключи ещё не настроены.</div>
+    </section>
     <nav class="bottom-nav">
-      <button class="active" type="button">💬 Чат</button>
       <button id="appsNav" type="button">⚡ Команды</button>
       <button id="modeNav" type="button">📱 Телефон</button>
-      <button type="button">⚙️ Настройки</button>
+      <button id="settingsNav" type="button">⚙️ Настройки</button>
     </nav>
   </main>
   <script src="app.js"></script>
