@@ -5297,20 +5297,15 @@ class JARVISUltimate(tk.Tk):
             music_exclude = ['что', 'как', 'расскаж', 'где', 'почему', 'про', 'ознаком', 'что такое', 'зачем', 'когда', 'знаешь', 'умеешь', 'можешь']
             has_music_question = any(kw in cmd for kw in music_exclude)
             
-            # Проверяем конкретную команду на музыку
-            is_music_cmd = any(k in cmd for k in ['яндекс.музык', 'яндекс музык', 'yandex.music', 'yandexmusic', 'открой музыку', 'запусти музыку', 'включи музыку', 'запусти музыку', 'играй музыку'])
-            # 'открой яндекс' без 'музыку' открывает браузер, а не музыку
-            if 'открой яндекс' in cmd and 'музык' not in cmd:
-                is_music_cmd = False
-            
-            if not has_music_question and is_music_cmd:
-                self.yandex_music_cmd('open')
-            elif not has_music_question and any(k in cmd for k in ['музыку пауз', 'музыку стоп', 'пауза музыку', 'стоп музыку', 'останови музыку', 'паузу музыку', 'приостанови музыку', 'пауз', 'стоп музыку', 'останови']):
+            # ВАЖНО: Проверяем pause/next/prev ПЕРВЫМИ, чтобы не сработало 'включи музыку'
+            if not has_music_question and any(k in cmd for k in ['музыку пауз', 'музыку стоп', 'пауза музыку', 'стоп музыку', 'останови музыку', 'паузу музыку', 'приостанови музыку', 'пауз', 'стоп музыку', 'останови']):
                 self.yandex_music_cmd('pause')
-            elif not has_music_question and any(k in cmd for k in ['музыку играть', 'музыку включи', 'продолжи музыку', 'воспроизведи музыку', 'следующий трек', 'следующую музыку', 'следующая композиц', 'далее музыку', 'дальше музыку', 'следующая', 'следующий']):
+            elif not has_music_question and any(k in cmd for k in ['следующий трек', 'следующую музыку', 'следующая композиц', 'далее музыку', 'дальше музыку', 'следующая', 'следующий']):
                 self.yandex_music_cmd('next')
             elif not has_music_question and any(k in cmd for k in ['предыдущий трек', 'предыдущую музыку', 'назад трек', 'назад музыку', 'предыдущая', 'предыдущий', 'сначала музыку', 'заново музыку']):
                 self.yandex_music_cmd('prev')
+            elif not has_music_question and any(k in cmd for k in ['музыку играть', 'музыку включи', 'продолжи музыку', 'воспроизведи музыку']):
+                self.yandex_music_cmd('play')
             elif not has_music_question and any(k in cmd for k in ['громче музыку', 'громче играй', 'увеличь музыку', 'музыку громче']):
                 self.yandex_music_cmd('volume_up')
             elif not has_music_question and any(k in cmd for k in ['тише музыку', 'тише играй', 'уменьши музыку', 'музыку тише']):
@@ -5319,6 +5314,16 @@ class JARVISUltimate(tk.Tk):
                 self.yandex_music_cmd('shuffle')
             elif not has_music_question and any(k in cmd for k in ['повтори музыку', 'repeat', 'повтор']):
                 self.yandex_music_cmd('repeat')
+            
+            # Проверяем команду на ВКЛЮЧЕНИЕ музыки (в самом конце, после всех остальных команд)
+            elif not has_music_question:
+                is_music_cmd = any(k in cmd for k in ['яндекс.музык', 'яндекс музык', 'yandex.music', 'yandexmusic', 'открой музыку', 'запусти музыку', 'включи музыку', 'играй музыку'])
+                # 'открой яндекс' без 'музыку' открывает браузер, а не музыку
+                if 'открой яндекс' in cmd and 'музык' not in cmd:
+                    is_music_cmd = False
+                
+                if is_music_cmd:
+                    self.yandex_music_cmd('open')
             elif any(k in cmd for k in ['плейлист', 'плей']): 
                 playlist_match = re.search(r'(?:открой|играй|включи)\s+плейлист\s+(.+)', cmd)
                 if playlist_match:
