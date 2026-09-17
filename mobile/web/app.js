@@ -1,4 +1,4 @@
-const state={mode:'phone'};
+const state={mode:'phone',persona:localStorage.getItem('jarvisPersona')||'J.A.R.V.I.S.'};
 const message=document.getElementById('message');
 const command=document.getElementById('command');
 const send=document.getElementById('send');
@@ -8,26 +8,62 @@ const appsNav=document.getElementById('appsNav');
 const appsPanel=document.getElementById('appsPanel');
 const appsList=document.getElementById('appsList');
 const refreshApps=document.getElementById('refreshApps');
+const settingsNav=document.getElementById('settingsNav');
+const settingsPanel=document.getElementById('settingsPanel');
+const personaList=document.getElementById('personaList');
+const orbButton=document.getElementById('orbButton');
+
+const personas=[
+  ['J.A.R.V.I.S.','Стандартный'],
+  ['Astra','Творческий'],
+  ['Luna','Аналитический'],
+  ['Terra','Практичный'],
+  ['Cyber','Безопасность']
+];
 
 function render(){
   const phone=state.mode==='phone';
   modeButton.textContent=phone?'📱 PHONE MODE':'🖥️ PC MODE';
   modeNav.textContent=phone?'📱 Телефон':'🖥️ ПК';
   if(!phone) appsPanel.hidden=true;
-  message.textContent=phone?'Готов к управлению телефоном, сэр.':'Готов к управлению компьютером, сэр.';
+  message.textContent=phone?`Готов к работе, сэр. Персонаж: ${state.persona}`:'Готов к управлению компьютером, сэр.';
 }
 function toggleMode(){state.mode=state.mode==='phone'?'pc':'phone';render()}
-function sendCommand(){
-  const text=command.value.trim();
+function showMessage(text){message.textContent=text;}
+function sendCommand(textOverride){
+  const text=(textOverride||command.value).trim();
   if(!text)return;
-  message.textContent='Выполняю: «'+text+'»';
+  showMessage('Выполняю: «'+text+'»');
   if(state.mode==='phone' && window.AndroidJarvis){
-    try{message.textContent=window.AndroidJarvis.command(text)||'Команда выполнена.'}
-    catch(e){message.textContent='Ошибка выполнения команды на телефоне.'}
-  }else if(state.mode==='phone') message.textContent='PHONE MODE работает в APK JARVIS.';
-  else message.textContent='PC MODE: подключение к компьютеру будет следующим этапом.';
+    try{
+      const result=window.AndroidJarvis.command(text);
+      showMessage(result||'Команда выполнена.');
+      if(typeof window.AndroidJarvis.speak==='function') window.AndroidJarvis.speak(result||'Команда выполнена.');
+    }catch(e){showMessage('Ошибка выполнения команды на телефоне.')}
+  }else if(state.mode==='phone') showMessage('PHONE MODE работает в APK JARVIS.');
+  else showMessage('PC MODE: подключение к компьютеру будет следующим этапом.');
   command.value='';
 }
+function startListening(){
+  if(!(window.AndroidJarvis&&typeof window.AndroidJarvis.startListening==='function')){
+    showMessage('Голосовой ввод доступен в APK JARVIS.'); return;
+  }
+  showMessage('Слушаю…');
+  window.AndroidJarvis.startListening();
+}
+function onSpeechResult(text){
+  if(!text)return;
+  const clean=text.trim();
+  const wake=/^(джарвис|jarvis)[,\s.!?]*/i;
+  if(wake.test(clean)){
+    const commandText=clean.replace(wake,'').trim();
+    if(!commandText){showMessage('Слушаю…');return;}
+    sendCommand(commandText);
+    return;
+  }
+  sendCommand(clean);
+}
+window.onJarvisSpeechResult=onSpeechResult;
 function loadApps(){
   if(!(window.AndroidJarvis&&typeof window.AndroidJarvis.listApps==='function')){appsList.innerHTML='<div class="app-empty">Список приложений доступен внутри APK JARVIS.</div>';return}
   try{
@@ -35,14 +71,30 @@ function loadApps(){
     apps.forEach(app=>{
       const row=document.createElement('label'); row.className='app-row';
       row.innerHTML='<span>'+app.label+'</span><input type="checkbox" '+(app.allowed?'checked':'')+'>';
-      row.querySelector('input').addEventListener('change',e=>{message.textContent=window.AndroidJarvis.setAppAllowed(app.packageName,e.target.checked)});
+      row.querySelector('input').addEventListener('change',e=>{showMessage(window.AndroidJarvis.setAppAllowed(app.packageName,e.target.checked))});
       appsList.appendChild(row);
     });
     if(!apps.length)appsList.innerHTML='<div class="app-empty">Приложения не найдены.</div>';
   }catch(e){appsList.innerHTML='<div class="app-empty">Не удалось загрузить приложения.</div>'}
 }
-function toggleApps(){if(state.mode!=='phone')state.mode='phone';appsPanel.hidden=!appsPanel.hidden;if(!appsPanel.hidden)loadApps()}
+function toggleApps(){if(state.mode!=='phone')state.mode='phone';settingsPanel.hidden=true;appsPanel.hidden=!appsPanel.hidden;if(!appsPanel.hidden)loadApps()}
+function loadPersonas(){
+  personaList.innerHTML='';
+  personas.forEach(([name,description])=>{
+    const row=document.createElement('label'); row.className='app-row';
+    row.innerHTML=`<span><strong>${name}</strong><small> — ${description}</small></span><input type="radio" name="persona" ${state.persona===name?'checked':''}>`;
+    row.querySelector('input').addEventListener('change',()=>{
+      state.persona=name; localStorage.setItem('jarvisPersona',name);
+      if(window.AndroidJarvis&&typeof window.AndroidJarvis.setPersona==='function') window.AndroidJarvis.setPersona(name);
+      showMessage(`Персонаж ${name} выбран.`); render();
+    });
+    personaList.appendChild(row);
+  });
+}
+function toggleSettings(){appsPanel.hidden=true;settingsPanel.hidden=!settingsPanel.hidden;if(!settingsPanel.hidden)loadPersonas()}
 modeButton.addEventListener('click',toggleMode); modeNav.addEventListener('click',toggleMode);
 appsNav.addEventListener('click',toggleApps); refreshApps.addEventListener('click',loadApps);
-send.addEventListener('click',sendCommand); command.addEventListener('keydown',e=>{if(e.key==='Enter')sendCommand()});
+settingsNav.addEventListener('click',toggleSettings);
+send.addEventListener('click',()=>sendCommand()); command.addEventListener('keydown',e=>{if(e.key==='Enter')sendCommand()});
+orbButton.addEventListener('click',startListening); orbButton.addEventListener('keydown',e=>{if(e.key==='Enter'||e.key===' ')startListening()});
 render();
