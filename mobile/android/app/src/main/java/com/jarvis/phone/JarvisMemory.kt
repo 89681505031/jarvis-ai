@@ -166,7 +166,8 @@ class JarvisMemory(context: Context) {
         return buildString {
             if (name.isNotBlank()) append("Имя пользователя: ").append(name).append("\n")
             append("Наблюдаемые привычки использования телефона: ").append(habits).append("\n")
-            val facts = factsSummary()\n            if (facts != "Пока важных фактов обо мне не сохранено.") append(facts).append("\n")
+            val facts = factsSummary()
+            if (facts != "Пока важных фактов обо мне не сохранено.") append(facts).append("\n")
             if (frequentText.isNotBlank()) append("Частые команды пользователя: ").append(frequentText).append("\n")
             if (dialogues.isNotEmpty()) {
                 append("Последние ").append(dialogues.size).append(" диалогов:\n")
