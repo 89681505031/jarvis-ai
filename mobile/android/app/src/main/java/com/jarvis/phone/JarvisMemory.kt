@@ -42,16 +42,58 @@ class JarvisMemory(context: Context) {
         }
     }
 
+
     fun recordHabit(text: String) {
         val category = habitCategory(text)
         synchronized(lock) {
             val habits = JSONObject(prefs.getString("habits", "{}"))
             habits.put(category, habits.optInt(category, 0) + 1)
             val commands = JSONObject(prefs.getString("habit_commands", "{}"))
-            val key = text.trim().lowercase(Locale("ru", "RU")).replace(Regex("\\s+"), " ").take(120)
+            val key = normalize(text).take(120)
             if (key.isNotBlank()) commands.put(key, commands.optInt(key, 0) + 1)
-            prefs.edit().putString("habits", habits.toString()).putString("habit_commands", commands.toString()).apply()
+
+            val facts = JSONArray(prefs.getString("facts", "[]"))
+            var limitedFacts = facts
+            extractFacts(text).forEach { fact ->
+                val next = JSONArray()
+                for (i in 0 until limitedFacts.length()) {
+                    val existing = limitedFacts.optString(i).trim()
+                    if (existing.isNotBlank() && !existing.equals(fact, ignoreCase = true)) next.put(existing)
+                }
+                next.put(fact)
+                limitedFacts = next
+            }
+            val start = maxOf(0, limitedFacts.length() - 30)
+            val finalFacts = JSONArray()
+            for (i in start until limitedFacts.length()) finalFacts.put(limitedFacts.optString(i))
+
+            prefs.edit()
+                .putString("habits", habits.toString())
+                .putString("habit_commands", commands.toString())
+                .putString("facts", finalFacts.toString())
+                .apply()
         }
+    }
+
+    fun forgetLastFact(): Boolean = synchronized(lock) {
+        val facts = JSONArray(prefs.getString("facts", "[]"))
+        if (facts.length() == 0) return false
+        val next = JSONArray()
+        for (i in 0 until facts.length() - 1) next.put(facts.optString(i))
+        prefs.edit().putString("facts", next.toString()).apply()
+        true
+    }
+
+    fun factsSummary(): String = synchronized(lock) {
+        val facts = JSONArray(prefs.getString("facts", "[]"))
+        if (facts.length() == 0) return "Пока важных фактов обо мне не сохранено."
+        buildString {
+            append("Что JARVIS запомнил о пользователе:\n")
+            for (i in 0 until facts.length()) {
+                val fact = facts.optString(i).trim()
+                if (fact.isNotBlank()) append("• ").append(fact).append("\n")
+            }
+        }.trim()
     }
 
     fun habitsSummary(): String {
@@ -87,7 +129,7 @@ class JarvisMemory(context: Context) {
         val frequentText = frequent.sortedByDescending { pair -> pair.second }.take(5).joinToString(", ") { pair -> "«" + pair.first + "» (" + pair.second + " раз)" }
         return buildString {
             if (name.isNotBlank()) append("Имя пользователя: ").append(name).append("\n")
-            append("Наблюдаемые привычки использования телефона: ").append(habits).append("\n")
+            append("Наблюдаемые привычки использования телефона: ").append(habits).append("\n")\n            val facts = factsSummary()\n            if (facts != "Пока важных фактов обо мне не сохранено.") append(facts).append("\n")
             if (frequentText.isNotBlank()) append("Частые команды пользователя: ").append(frequentText).append("\n")
             if (dialogues.isNotEmpty()) {
                 append("Последние ").append(dialogues.size).append(" диалогов:\n")
@@ -97,6 +139,31 @@ class JarvisMemory(context: Context) {
                 }
             }
         }.trim()
+    }
+
+
+    private fun normalize(text: String): String =
+        text.trim().lowercase(Locale("ru", "RU")).replace(Regex("\\s+"), " ")
+
+    private fun extractFacts(text: String): List<String> {
+        val clean = text.trim().replace(Regex("\\s+"), " ")
+        val lower = clean.lowercase(Locale("ru", "RU"))
+        val prefixes = listOf(
+            "я люблю " to "Пользователь любит ",
+            "мне нравится " to "Пользователю нравится ",
+            "я предпочитаю " to "Пользователь предпочитает ",
+            "я хочу " to "Пользователь хочет ",
+            "я не люблю " to "Пользователь не любит ",
+            "я работаю " to "Пользователь работает ",
+            "я живу " to "Пользователь живёт "
+        )
+        for ((prefix, label) in prefixes) {
+            if (lower.startsWith(prefix) && clean.length > prefix.length) {
+                val value = clean.substring(prefix.length).trim().trimEnd('.', '!', '?')
+                if (value.length >= 2) return listOf(label + value)
+            }
+        }
+        return emptyList()
     }
 
     private fun habitCategory(text: String): String {
