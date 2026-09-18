@@ -17,6 +17,7 @@ class GigaChatClient(private val context: Context) {
 
     @Volatile private var accessToken: String? = null
     @Volatile private var tokenExpiresAt: Long = 0L
+    @Volatile private var tokenKeyFingerprint: Int? = null
 
     fun ask(userText: String, persona: String, memoryContext: String = ""): String {
         val key = context.getSharedPreferences("jarvis_settings", Context.MODE_PRIVATE)
@@ -53,6 +54,12 @@ class GigaChatClient(private val context: Context) {
 
     @Synchronized private fun getToken(key: String): String {
         val now = System.currentTimeMillis()
+        val fingerprint = key.hashCode()
+        if (tokenKeyFingerprint != fingerprint) {
+            accessToken = null
+            tokenExpiresAt = 0L
+            tokenKeyFingerprint = fingerprint
+        }
         accessToken?.let { if (now + 60_000L < tokenExpiresAt) return it }
         val response = postForm(TOKEN_URL, "scope=GIGACHAT_API_PERS", mapOf(
             "Authorization" to "Basic $key",
