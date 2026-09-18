@@ -8,7 +8,7 @@ import android.content.pm.PackageManager
 import android.net.Uri
 import android.provider.ContactsContract
 import android.provider.Settings
-import androidx.core.content.ContextCompat
+import androidx.core.content.ContextCompat\nimport androidx.core.app.ActivityCompat
 import java.util.Locale
 
 class PhoneCommandRouter(private val context: Context) {
@@ -89,13 +89,13 @@ class PhoneCommandRouter(private val context: Context) {
 
     private fun callContact(name: String): String {
         if (name.isBlank()) return "Назовите имя контакта."
-        if (ContextCompat.checkSelfPermission(context, Manifest.permission.READ_CONTACTS) != PackageManager.PERMISSION_GRANTED) return "Нужен доступ к контактам Android."
+        if (ContextCompat.checkSelfPermission(context, Manifest.permission.READ_CONTACTS) != PackageManager.PERMISSION_GRANTED) {\n            requestPermission(Manifest.permission.READ_CONTACTS)\n            return "Запрашиваю доступ к контактам Android."\n        }
         val projection = arrayOf(ContactsContract.CommonDataKinds.Phone.NUMBER)
         val selection = "${ContactsContract.CommonDataKinds.Phone.DISPLAY_NAME} LIKE ?"
         context.contentResolver.query(ContactsContract.CommonDataKinds.Phone.CONTENT_URI, projection, selection, arrayOf("%$name%"), null)?.use { cursor ->
             if (cursor.moveToFirst()) {
                 val number = cursor.getString(0)
-                if (ContextCompat.checkSelfPermission(context, Manifest.permission.CALL_PHONE) != PackageManager.PERMISSION_GRANTED) return "Нужен доступ к телефону для выполнения вызова."
+                if (ContextCompat.checkSelfPermission(context, Manifest.permission.CALL_PHONE) != PackageManager.PERMISSION_GRANTED) {\n                    requestPermission(Manifest.permission.CALL_PHONE)\n                    return "Запрашиваю доступ к телефону для выполнения вызова."\n                }
                 context.startActivity(Intent(Intent.ACTION_CALL, Uri.parse("tel:" + Uri.encode(number))).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
                 return "Звоню контакту $name."
             }
@@ -104,7 +104,7 @@ class PhoneCommandRouter(private val context: Context) {
     }
 
     private fun missedCalls(): String {
-        if (ContextCompat.checkSelfPermission(context, Manifest.permission.READ_CALL_LOG) != PackageManager.PERMISSION_GRANTED) return "Нужен доступ к журналу вызовов Android."
+        if (ContextCompat.checkSelfPermission(context, Manifest.permission.READ_CALL_LOG) != PackageManager.PERMISSION_GRANTED) {\n            requestPermission(Manifest.permission.READ_CALL_LOG)\n            return "Запрашиваю доступ к журналу вызовов Android."\n        }
         context.contentResolver.query(android.provider.CallLog.Calls.CONTENT_URI, arrayOf("number", "date", "type"), "type = ?", arrayOf("3"), "date DESC")?.use { cursor ->
             if (!cursor.moveToFirst()) return "Пропущенных вызовов не найдено."
             return "Последний пропущенный вызов: ${cursor.getString(0) ?: "неизвестный номер"}."
@@ -202,7 +202,7 @@ class PhoneCommandRouter(private val context: Context) {
         }
     }
 
-    private fun normalizeAppName(value: String): String =
+    private fun requestPermission(permission: String) {\n        val activity = context as? Activity ?: return\n        activity.runOnUiThread {\n            ActivityCompat.requestPermissions(activity, arrayOf(permission), 100)\n        }\n    }\n\n    private fun normalizeAppName(value: String): String =
         value.trim().lowercase(Locale("ru", "RU")).replace(Regex("[^a-zа-яё0-9]+"), " ").trim()
 
     private fun openAllowedApp(name: String): String {
