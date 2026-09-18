@@ -33,6 +33,29 @@ class JarvisAccessibilityService : AccessibilityService() {
         return clickRecursive(root, text)
     }
 
+    fun clickAnyText(vararg texts: String): Boolean {
+        val root = rootInActiveWindow ?: return false
+        for (text in texts) {
+            if (clickRecursive(root, text)) return true
+        }
+        return false
+    }
+
+    fun visibleText(): String {
+        val root = rootInActiveWindow ?: return ""
+        val out = mutableListOf<String>()
+        collectText(root, out)
+        return out.distinct().joinToString("\n").take(12000)
+    }
+
+    private fun collectText(node: AccessibilityNodeInfo, out: MutableList<String>) {
+        node.text?.toString()?.trim()?.takeIf { it.isNotBlank() }?.let(out::add)
+        node.contentDescription?.toString()?.trim()?.takeIf { it.isNotBlank() }?.let(out::add)
+        for (i in 0 until node.childCount) {
+            node.getChild(i)?.let { collectText(it, out) }
+        }
+    }
+
     private fun clickRecursive(node: AccessibilityNodeInfo, text: String): Boolean {
         val nodeText = node.text?.toString()
         val description = node.contentDescription?.toString()
