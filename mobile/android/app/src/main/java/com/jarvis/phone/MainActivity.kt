@@ -584,6 +584,8 @@ class MainActivity : Activity() {
 
             if (
                 normalized.contains("последние чаты") ||
+                normalized.contains("покажи последние чаты") ||
+                normalized.contains("последние разговоры") ||
                 normalized.contains("последний чат") ||
                 normalized.contains("что мы обсуждали") ||
                 normalized.contains("что я спрашивал") ||
