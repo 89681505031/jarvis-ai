@@ -2,6 +2,7 @@ package com.jarvis.phone
 
 import android.content.Context
 import android.media.MediaPlayer
+import org.json.JSONObject
 import java.io.File
 import java.net.HttpURLConnection
 import java.net.URL
@@ -40,7 +41,12 @@ class FishAudioTts(private val context: Context) {
 
         executor.execute {
             try {
-                val body = "{"text":${json(text)},"reference_id":${json(voiceId)},"format":"mp3"}"
+                val body = JSONObject().apply {
+                    put("text", text)
+                    put("reference_id", voiceId)
+                    put("format", "mp3")
+                }.toString()
+
                 val connection = (URL(API_URL).openConnection() as HttpURLConnection).apply {
                     requestMethod = "POST"
                     connectTimeout = 15000
@@ -50,11 +56,16 @@ class FishAudioTts(private val context: Context) {
                     setRequestProperty("Content-Type", "application/json")
                     setRequestProperty("model", MODEL)
                 }
+
                 connection.outputStream.use { it.write(body.toByteArray(Charsets.UTF_8)) }
-                if (connection.responseCode !in 200..299) throw IllegalStateException("Fish Audio HTTP ${connection.responseCode}")
+                if (connection.responseCode !in 200..299) {
+                    throw IllegalStateException("Fish Audio HTTP ${connection.responseCode}")
+                }
 
                 val file = File(context.cacheDir, "jarvis_fish_${System.currentTimeMillis()}.mp3")
-                connection.inputStream.use { input -> file.outputStream().use { output -> input.copyTo(output) } }
+                connection.inputStream.use { input ->
+                    file.outputStream().use { output -> input.copyTo(output) }
+                }
                 connection.disconnect()
 
                 android.os.Handler(android.os.Looper.getMainLooper()).post {
@@ -83,8 +94,4 @@ class FishAudioTts(private val context: Context) {
         player = null
         executor.shutdownNow()
     }
-
-    private fun json(value: String) =
-        """ + value.replace("\", "\\").replace(""", "\"").replace("
-", "\n").replace("", "\r") + """
 }
