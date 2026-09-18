@@ -152,6 +152,7 @@ class MainActivity : Activity() {
             }
             override fun onResults(results: Bundle?) {
                 if (isSpeaking) return
+                wakeListening = false
                 manualListening = false
                 val text = results?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)?.firstOrNull()?.trim().orEmpty()
                 if (text.isBlank()) {
@@ -564,6 +565,46 @@ class MainActivity : Activity() {
                 normalized.contains("прочитай сообщение") ||
                 normalized.contains("новые сообщения")
             ) return notificationReply()
+
+            if (
+                normalized.contains("кто тебя создал") ||
+                normalized.contains("кто тебя разработал") ||
+                normalized.contains("кто тебя придумал") ||
+                normalized.contains("кто твой создатель") ||
+                normalized.contains("кто создал тебя")
+            ) {
+                val answer = if (selectedPersona == "J.A.R.V.I.S.") {
+                    "Я J.A.R.V.I.S. — искусственный интеллект и голосовой помощник Тони Старка из фильма «Железный человек»."
+                } else {
+                    "Я $selectedPersona — персонаж J.A.R.V.I.S. и мой создатель — сам J.A.R.V.I.S. из фильма «Железный человек»."
+                }
+                memory.rememberTurn(text, answer)
+                return answer
+            }
+
+            if (
+                normalized.contains("последние чаты") ||
+                normalized.contains("последний чат") ||
+                normalized.contains("что мы обсуждали") ||
+                normalized.contains("что я спрашивал") ||
+                normalized.contains("что я спрашивала")
+            ) {
+                val dialogues = memory.recentDialogues().takeLast(8)
+                val answer = if (dialogues.isEmpty()) {
+                    "Я пока не сохранил прошлые диалоги."
+                } else {
+                    buildString {
+                        append("Вот последние сохранённые диалоги:\n")
+                        dialogues.forEachIndexed { index, pair ->
+                            append(index + 1).append(". Вы: ").append(pair.first)
+                                .append(" | Я: ").append(pair.second).append("\n")
+                        }
+                    }.trim()
+                }
+                memory.rememberTurn(text, answer)
+                return answer
+            }
+
             if (router.canHandle(text)) {
                 val result = router.execute(text)
                 memory.rememberTurn(text, result)
