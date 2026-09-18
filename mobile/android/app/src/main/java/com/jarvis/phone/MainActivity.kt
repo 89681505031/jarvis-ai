@@ -43,6 +43,7 @@ class MainActivity : Activity() {
     private lateinit var memory: JarvisMemory
     private var wakeListening = false
     private var manualListening = false
+    private var conversationUntil = 0L
     private val prefs by lazy { getSharedPreferences("jarvis_settings", MODE_PRIVATE) }
     private val backgroundExecutor = Executors.newFixedThreadPool(3)
     private val mainHandler = Handler(Looper.getMainLooper())
@@ -87,6 +88,10 @@ class MainActivity : Activity() {
             override fun onError(error: Int) {
                 val wasManual = manualListening
                 manualListening = false
+                if (conversationUntil > System.currentTimeMillis()) {
+                    restartConversationListening()
+                    return
+                }
                 restartWakeListening()
                 if (wasManual) {
                     runOnUiThread {
@@ -95,10 +100,14 @@ class MainActivity : Activity() {
                 }
             }
             override fun onResults(results: Bundle?) {
-                val text = results?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)?.firstOrNull() ?: return
                 manualListening = false
+                val text = results?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)?.firstOrNull()?.trim().orEmpty()
+                if (text.isBlank()) {
+                    if (conversationUntil > System.currentTimeMillis()) restartConversationListening() else restartWakeListening()
+                    return
+                }
                 val escaped = JSONObject.quote(text)
-                restartWakeListening()
+                if (conversationUntil > System.currentTimeMillis()) restartConversationListening() else restartWakeListening()
                 runOnUiThread {
                     if (::webView.isInitialized) webView.evaluateJavascript("window.onJarvisSpeechResult && window.onJarvisSpeechResult($escaped)", null)
                 }
@@ -107,10 +116,10 @@ class MainActivity : Activity() {
     }
 
     private fun startListening() {
-        wakeListening = false
-        // Отмена фонового распознавания может вызвать onError. Это не ошибка ручного ввода.
-        manualListening = false
-        speechRecognizer?.cancel()
+        startConversationListening(10_000)
+    }
+
+    private fun startConversationListening(durationMs: Long) {
         if (ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {
             requestRuntimePermissions()
             return
@@ -119,14 +128,46 @@ class MainActivity : Activity() {
             Toast.makeText(this, "Голосовой ввод недоступен на этом устройстве.", Toast.LENGTH_SHORT).show()
             return
         }
-        manualListening = true
-        val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
-            putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
-            putExtra(RecognizerIntent.EXTRA_LANGUAGE, "ru-RU")
-            putExtra(RecognizerIntent.EXTRA_LANGUAGE_PREFERENCE, "ru-RU")
-            putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, 3)
+        conversationUntil = System.currentTimeMillis() + durationMs
+        wakeListening = false
+        manualListening = false
+        speechRecognizer?.cancel()
+        mainHandler.postDelayed({
+            if (conversationUntil > System.currentTimeMillis()) startConversationRecognition()
+            else restartWakeListening()
+        }, 180)
+    }
+
+    private fun startConversationRecognition() {
+        if (conversationUntil <= System.currentTimeMillis() || speechRecognizer == null) {
+            conversationUntil = 0L
+            restartWakeListening()
+            return
         }
-        speechRecognizer?.startListening(intent)
+        manualListening = true
+        try {
+            val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
+                putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
+                putExtra(RecognizerIntent.EXTRA_LANGUAGE, "ru-RU")
+                putExtra(RecognizerIntent.EXTRA_LANGUAGE_PREFERENCE, "ru-RU")
+                putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, 3)
+                putExtra(RecognizerIntent.EXTRA_PARTIAL_RESULTS, false)
+            }
+            speechRecognizer?.startListening(intent)
+        } catch (_: Exception) {
+            manualListening = false
+            restartConversationListening()
+        }
+    }
+
+    private fun restartConversationListening() {
+        manualListening = false
+        if (conversationUntil <= System.currentTimeMillis()) {
+            conversationUntil = 0L
+            restartWakeListening()
+            return
+        }
+        mainHandler.postDelayed({ startConversationRecognition() }, 250)
     }
 
     private fun speak(text: String) {
@@ -196,6 +237,7 @@ class MainActivity : Activity() {
                     webView.evaluateJavascript("window.onGigaChatResult && window.onGigaChatResult($escaped)", null)
                 }
                 speak(answer)
+                startConversationListening(12_000)
             }
         }
     }
@@ -223,6 +265,10 @@ class MainActivity : Activity() {
     }
 
     private fun restartWakeListening() {
+        if (conversationUntil > System.currentTimeMillis()) {
+            restartConversationListening()
+            return
+        }
         wakeListening = false
         mainHandler.postDelayed({ startWakeListening() }, 350)
     }
@@ -234,6 +280,7 @@ class MainActivity : Activity() {
 
     override fun onPause() {
         wakeListening = false
+        conversationUntil = 0L
         speechRecognizer?.cancel()
         super.onPause()
     }
@@ -360,6 +407,9 @@ class MainActivity : Activity() {
         }
 
         @JavascriptInterface fun startListening() { runOnUiThread { this@MainActivity.startListening() } }
+        @JavascriptInterface fun startConversationWindow(seconds: Int) {
+            runOnUiThread { this@MainActivity.startConversationListening(seconds.coerceIn(1, 30) * 1000L) }
+        }
         @JavascriptInterface fun speak(text: String) { runOnUiThread { this@MainActivity.speak(text) } }
         @JavascriptInterface fun setPersona(name: String) { selectedPersona = name; prefs.edit().putString("persona", name).apply() }
 
