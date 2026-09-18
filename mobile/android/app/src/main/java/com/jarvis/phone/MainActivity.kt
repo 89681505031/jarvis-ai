@@ -39,9 +39,9 @@ class MainActivity : Activity() {
     private var speechRecognizer: SpeechRecognizer? = null
     private var tts: TextToSpeech? = null
     private var selectedPersona = "J.A.R.V.I.S."
-    private lateinit var fishAudioTts
+    private lateinit var fishAudioTts: FishAudioTts
     private lateinit var memory: JarvisMemory
-    private var wakeListening = false: FishAudioTts
+    private var wakeListening = false
     private val prefs by lazy { getSharedPreferences("jarvis_settings", MODE_PRIVATE) }
     private val backgroundExecutor = Executors.newFixedThreadPool(3)
     private val mainHandler = Handler(Looper.getMainLooper())
