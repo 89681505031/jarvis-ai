@@ -579,7 +579,7 @@ class MainActivity : Activity() {
                 } else {
                     "Я $selectedPersona — персонаж J.A.R.V.I.S. и мой создатель — сам J.A.R.V.I.S. из фильма «Железный человек»."
                 }
-                memory.rememberTurn(text, answer)
+                memory.rememberTurn(memoryText, answer)
                 return answer
             }
 
@@ -603,6 +603,59 @@ class MainActivity : Activity() {
                                 .append(" | Я: ").append(pair.second).append("\n")
                         }
                     }.trim()
+                }
+                memory.rememberTurn(memoryText, answer)
+                return answer
+            }
+
+            if (
+                normalized == "что ты помнишь обо мне" ||
+                normalized == "что ты обо мне помнишь" ||
+                normalized == "что ты знаешь обо мне" ||
+                normalized == "какую информацию ты обо мне помнишь"
+            ) {
+                val answer = memory.factsSummary()
+                memory.rememberTurn(memoryText, answer)
+                return answer
+            }
+
+            if (
+                normalized.startsWith("запомни что ") ||
+                normalized.startsWith("запомни, что ") ||
+                normalized.startsWith("запомни: ")
+            ) {
+                val factText = memoryText
+                    .replaceFirst(Regex("(?i)^запомни\\s*,?\\s*"), "")
+                    .trim()
+                val answer = if (memory.rememberFact(factText)) {
+                    "Запомнил: $factText"
+                } else {
+                    "Не получилось сохранить информацию. Скажите, что именно нужно запомнить."
+                }
+                memory.rememberTurn(memoryText, answer)
+                return answer
+            }
+
+            if (
+                normalized == "забудь это" ||
+                normalized == "забудь последнее" ||
+                normalized == "забудь последнюю информацию"
+            ) {
+                val answer = if (memory.forgetLastFact()) {
+                    "Хорошо, последнюю сохранённую информацию забыл."
+                } else {
+                    "У меня нет сохранённого факта, который можно забыть."
+                }
+                memory.rememberTurn(memoryText, answer)
+                return answer
+            }
+
+            if (normalized.startsWith("забудь что ") || normalized.startsWith("забудь, что ")) {
+                val query = memoryText.replaceFirst(Regex("(?i)^забудь\\s*,?\\s*что\\s*"), "").trim()
+                val answer = if (memory.forgetFact(query)) {
+                    "Хорошо, эту информацию забыл."
+                } else {
+                    "Я не нашёл такую информацию в памяти."
                 }
                 memory.rememberTurn(memoryText, answer)
                 return answer
