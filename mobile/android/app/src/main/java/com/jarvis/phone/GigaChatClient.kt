@@ -18,7 +18,7 @@ class GigaChatClient(private val context: Context) {
     @Volatile private var accessToken: String? = null
     @Volatile private var tokenExpiresAt: Long = 0L
 
-    fun ask(userText: String, persona: String): String {
+    fun ask(userText: String, persona: String, memoryContext: String = ""): String {
         val key = context.getSharedPreferences("jarvis_settings", Context.MODE_PRIVATE)
             .getString("gigachat_api_key", "").orEmpty().trim()
         if (key.isBlank()) return "В настройках J.A.R.V.I.S. не указан API ключ GigaChat."
@@ -30,7 +30,7 @@ class GigaChatClient(private val context: Context) {
                 put("messages", JSONArray().apply {
                     put(JSONObject().apply {
                         put("role", "system")
-                        put("content", systemPrompt(persona))
+                        put("content", systemPrompt(persona) + if (memoryContext.isNotBlank()) "\n\nПамять пользователя:\n" + memoryContext else "")
                     })
                     put(JSONObject().apply {
                         put("role", "user")
