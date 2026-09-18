@@ -10,7 +10,7 @@ class JarvisMemory(context: Context) {
     private val lock = Any()
 
     fun setUserName(name: String) {
-        val clean = name.trim().replace(Regex("\s+"), " ")
+        val clean = name.trim().replace(Regex("\\s+"), " ")
         if (clean.isNotBlank()) prefs.edit().putString("user_name", clean).apply()
     }
 
