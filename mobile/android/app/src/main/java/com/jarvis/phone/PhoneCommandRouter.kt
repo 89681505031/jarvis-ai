@@ -24,7 +24,8 @@ class PhoneCommandRouter(private val context: Context) {
             lower.contains("включи фонарик") || lower.contains("выключи фонарик") ||
             lower.contains("включи свет") || lower.contains("выключи свет") ||
             lower.contains("увеличь громкость") || lower.contains("сделай громче") ||
-            lower.contains("уменьши громкость") || lower.contains("сделай тише")
+            lower.contains("уменьши громкость") || lower.contains("сделай тише") ||
+            lower.contains("выключи звук") || lower.contains("включи звук")
     }
 
     fun execute(raw: String): String {
@@ -47,6 +48,8 @@ class PhoneCommandRouter(private val context: Context) {
             lower.contains("выключи фонарик") || lower.contains("выключи свет") -> setFlashlight(false)
             lower.contains("увеличь громкость") || lower.contains("сделай громче") -> changeVolume(true)
             lower.contains("уменьши громкость") || lower.contains("сделай тише") -> changeVolume(false)
+            lower.contains("выключи звук") -> setMute(true)
+            lower.contains("включи звук") -> setMute(false)
             lower.startsWith("открой ") -> openAllowedApp(command.substringAfter("открой ").trim())
             else -> "Команда PHONE MODE пока не подключена: $command"
         }
@@ -116,6 +119,18 @@ class PhoneCommandRouter(private val context: Context) {
         val max = audio.getStreamMaxVolume(android.media.AudioManager.STREAM_MUSIC)
         val percent = if (max > 0) current * 100 / max else 0
         return "Громкость: $percent%."
+    }
+
+    private fun setMute(muted: Boolean): String {
+        val audio = context.getSystemService(Context.AUDIO_SERVICE) as? android.media.AudioManager
+            ?: return "Не удалось получить управление звуком."
+        return try {
+            val direction = if (muted) android.media.AudioManager.ADJUST_MUTE else android.media.AudioManager.ADJUST_UNMUTE
+            audio.adjustStreamVolume(android.media.AudioManager.STREAM_MUSIC, direction, 0)
+            if (muted) "Звук выключен." else "Звук включён."
+        } catch (_: Exception) {
+            "Не удалось изменить состояние звука."
+        }
     }
 
     private fun normalizeAppName(value: String): String =
