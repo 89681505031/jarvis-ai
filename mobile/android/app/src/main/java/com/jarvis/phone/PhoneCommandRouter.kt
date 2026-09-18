@@ -80,12 +80,19 @@ class PhoneCommandRouter(private val context: Context) {
         return "Не удалось прочитать журнал вызовов."
     }
 
+    private fun normalizeAppName(value: String): String =
+        value.trim().lowercase(Locale("ru", "RU")).replace(Regex("[^a-zа-яё0-9]+"), " ").trim()
+
     private fun openAllowedApp(name: String): String {
         if (name.isBlank()) return "Назовите приложение."
-        val match = launcherApps().firstOrNull { it.label.equals(name, true) || it.label.contains(name, true) }
-            ?: return "Приложение «$name» не найдено среди приложений телефона."
-        if (!allowedApps.isAllowed(match.packageName)) return "Приложение «${match.label}» ещё не добавлено в JARVIS. Нажмите «➕ Добавить приложение»."
-        return if (openPackage(match.packageName)) "Открываю ${match.label}." else "Не удалось открыть ${match.label}."
+        val wanted = normalizeAppName(name)
+        val match = launcherApps().firstOrNull {
+            val label = normalizeAppName(it.label)
+            label == wanted || label.contains(wanted) || wanted.contains(label)
+        }
+        if (match == null) return "Приложение «$name» не найдено. Откройте раздел «Приложение», найдите его и добавьте в JARVIS."
+        if (!allowedApps.isAllowed(match.packageName)) return "Приложение «" + match.label + "» найдено, но не подключено. Добавьте его в разделе «Приложение»."
+        return if (openPackage(match.packageName)) "Открываю " + match.label + "." else "Не удалось открыть " + match.label + "."
     }
 
     data class LaunchableApp(val label: String, val packageName: String)
