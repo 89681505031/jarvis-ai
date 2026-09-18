@@ -13,7 +13,7 @@ import java.util.concurrent.Executors
 class FishAudioTts(private val context: Context) {
     companion object {
         private const val API_URL = "https://api.fish.audio/v1/tts"
-        private const val MODEL = "s2-pro"
+        private const val MODEL = "s2.1-pro-free"
         private const val JARVIS_VOICE_ID = "4c3eaacc1a0545cdb0295bfddf3e3785"
         private const val ASTRA_VOICE_ID = "560ef3514c4f44ee9b36b270d718bb39"
         private const val LUNA_VOICE_ID = "2a1036d645634680b3cc69aeeb60375b"
@@ -55,13 +55,14 @@ class FishAudioTts(private val context: Context) {
                     doOutput = true
                     setRequestProperty("Authorization", "Bearer $apiKey")
                     setRequestProperty("Content-Type", "application/json")
+                    setRequestProperty("Accept", "audio/mpeg")
                     setRequestProperty("model", MODEL)
                 }
                 connection.outputStream.use { it.write(body.toByteArray(Charsets.UTF_8)) }
                 val code = connection.responseCode
                 if (code !in 200..299) {
-                    val error = connection.errorStream?.bufferedReader()?.use { it.readText() }.orEmpty()
-                    throw IllegalStateException("Fish Audio HTTP $code: ${error.take(160)}")
+                    val error = connection.errorStream?.bufferedReader(Charsets.UTF_8)?.use { it.readText() }.orEmpty()
+                    throw IllegalStateException("Fish Audio HTTP $code: ${error.take(240)}")
                 }
                 val file = File(context.cacheDir, "jarvis_fish_${System.currentTimeMillis()}.mp3")
                 connection.inputStream.use { input -> file.outputStream().use { output -> input.copyTo(output) } }
