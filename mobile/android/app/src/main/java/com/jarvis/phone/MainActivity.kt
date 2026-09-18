@@ -12,6 +12,7 @@ import android.speech.RecognitionListener
 import android.speech.RecognizerIntent
 import android.speech.SpeechRecognizer
 import android.speech.tts.TextToSpeech
+import android.speech.tts.UtteranceProgressListener
 import android.webkit.JavascriptInterface
 import android.webkit.WebView
 import android.webkit.WebViewClient
@@ -44,6 +45,9 @@ class MainActivity : Activity() {
     private var wakeListening = false
     private var manualListening = false
     private var conversationUntil = 0L
+    private var isSpeaking = false
+    private var resumeListeningAfterSpeech = false
+    private val conversationResumeDurationMs = 12_000L
     private val prefs by lazy { getSharedPreferences("jarvis_settings", MODE_PRIVATE) }
     private val backgroundExecutor = Executors.newFixedThreadPool(3)
     private val mainHandler = Handler(Looper.getMainLooper())
@@ -56,7 +60,14 @@ class MainActivity : Activity() {
         fishAudioTts = FishAudioTts(this)
         memory = JarvisMemory(this)
         tts = TextToSpeech(this) { status ->
-            if (status == TextToSpeech.SUCCESS) tts?.language = Locale("ru", "RU")
+            if (status == TextToSpeech.SUCCESS) {
+                tts?.language = Locale("ru", "RU")
+                tts?.setOnUtteranceProgressListener(object : UtteranceProgressListener() {
+                    override fun onStart(utteranceId: String?) { isSpeaking = true }
+                    override fun onDone(utteranceId: String?) { finishSpeech() }
+                    override fun onError(utteranceId: String?) { finishSpeech() }
+                })
+            }
         }
         setupSpeechRecognizer()
 
@@ -86,6 +97,7 @@ class MainActivity : Activity() {
             override fun onPartialResults(partialResults: Bundle?) = Unit
             override fun onEvent(eventType: Int, params: Bundle?) = Unit
             override fun onError(error: Int) {
+                if (isSpeaking) return
                 val wasManual = manualListening
                 manualListening = false
                 if (conversationUntil > System.currentTimeMillis()) {
@@ -100,6 +112,7 @@ class MainActivity : Activity() {
                 }
             }
             override fun onResults(results: Bundle?) {
+                if (isSpeaking) return
                 manualListening = false
                 val text = results?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)?.firstOrNull()?.trim().orEmpty()
                 if (text.isBlank()) {
@@ -120,6 +133,10 @@ class MainActivity : Activity() {
     }
 
     private fun startConversationListening(durationMs: Long) {
+        if (isSpeaking) {
+            resumeListeningAfterSpeech = true
+            return
+        }
         if (ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {
             requestRuntimePermissions()
             return
@@ -139,6 +156,7 @@ class MainActivity : Activity() {
     }
 
     private fun startConversationRecognition() {
+        if (isSpeaking) return
         if (conversationUntil <= System.currentTimeMillis() || speechRecognizer == null) {
             conversationUntil = 0L
             restartWakeListening()
@@ -161,6 +179,7 @@ class MainActivity : Activity() {
     }
 
     private fun restartConversationListening() {
+        if (isSpeaking) return
         manualListening = false
         if (conversationUntil <= System.currentTimeMillis()) {
             conversationUntil = 0L
@@ -170,19 +189,55 @@ class MainActivity : Activity() {
         mainHandler.postDelayed({ startConversationRecognition() }, 250)
     }
 
-    private fun speak(text: String) {
+    private fun stopRecognitionForSpeech(resumeAfter: Boolean) {
+        resumeListeningAfterSpeech = resumeAfter
+        isSpeaking = true
+        wakeListening = false
+        manualListening = false
+        conversationUntil = 0L
+        speechRecognizer?.cancel()
+    }
+
+    private fun finishSpeech() {
+        runOnUiThread {
+            isSpeaking = false
+            val shouldResume = resumeListeningAfterSpeech
+            resumeListeningAfterSpeech = false
+            if (shouldResume && !isFinishing && !isDestroyed) {
+                startConversationListening(conversationResumeDurationMs)
+            }
+        }
+    }
+
+    private fun speak(text: String, resumeAfterSpeech: Boolean = false) {
         if (text.isBlank()) return
+        stopRecognitionForSpeech(resumeAfterSpeech)
         val apiKey = prefs.getString("fish_api_key", "").orEmpty()
         val fishVoice = FishAudioTts.voiceIdFor(selectedPersona)
         if (apiKey.isNotBlank() && !fishVoice.isNullOrBlank()) {
-            fishAudioTts.speak(text, selectedPersona) { _ ->
-                runOnUiThread {
-                    tts?.speak(text, TextToSpeech.QUEUE_FLUSH, null, "jarvis-response-fallback")
-                    Toast.makeText(this, "Fish Audio недоступен — использую системный голос.", Toast.LENGTH_SHORT).show()
-                }
-            }
+            fishAudioTts.speak(
+                text,
+                selectedPersona,
+                onError = { _ ->
+                    runOnUiThread {
+                        tts?.speak(
+                            text,
+                            TextToSpeech.QUEUE_FLUSH,
+                            null,
+                            "jarvis-response-fallback-${System.currentTimeMillis()}"
+                        )
+                        Toast.makeText(this, "Fish Audio недоступен — использую системный голос.", Toast.LENGTH_SHORT).show()
+                    }
+                },
+                onComplete = { finishSpeech() }
+            )
         } else {
-            tts?.speak(text, TextToSpeech.QUEUE_FLUSH, null, "jarvis-response")
+            tts?.speak(
+                text,
+                TextToSpeech.QUEUE_FLUSH,
+                null,
+                "jarvis-response-${System.currentTimeMillis()}"
+            )
         }
     }
 
@@ -236,8 +291,7 @@ class MainActivity : Activity() {
                     val escaped = JSONObject.quote(answer)
                     webView.evaluateJavascript("window.onGigaChatResult && window.onGigaChatResult($escaped)", null)
                 }
-                speak(answer)
-                startConversationListening(12_000)
+                speak(answer, resumeAfterSpeech = true)
             }
         }
     }
@@ -250,6 +304,7 @@ class MainActivity : Activity() {
     }
 
     private fun startWakeListening() {
+        if (isSpeaking) return
         if (ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) return
         if (speechRecognizer == null || wakeListening) return
         wakeListening = true
@@ -265,6 +320,7 @@ class MainActivity : Activity() {
     }
 
     private fun restartWakeListening() {
+        if (isSpeaking) return
         if (conversationUntil > System.currentTimeMillis()) {
             restartConversationListening()
             return
@@ -410,7 +466,7 @@ class MainActivity : Activity() {
         @JavascriptInterface fun startConversationWindow(seconds: Int) {
             runOnUiThread { this@MainActivity.startConversationListening(seconds.coerceIn(1, 30) * 1000L) }
         }
-        @JavascriptInterface fun speak(text: String) { runOnUiThread { this@MainActivity.speak(text) } }
+        @JavascriptInterface fun speak(text: String) { runOnUiThread { this@MainActivity.speak(text, resumeAfterSpeech = false) } }
         @JavascriptInterface fun setPersona(name: String) { selectedPersona = name; prefs.edit().putString("persona", name).apply() }
 
         @JavascriptInterface fun getUserName(): String = memory.getUserName()
