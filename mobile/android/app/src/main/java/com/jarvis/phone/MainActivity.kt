@@ -39,7 +39,9 @@ class MainActivity : Activity() {
     private var speechRecognizer: SpeechRecognizer? = null
     private var tts: TextToSpeech? = null
     private var selectedPersona = "J.A.R.V.I.S."
-    private lateinit var fishAudioTts: FishAudioTts
+    private lateinit var fishAudioTts
+    private lateinit var memory: JarvisMemory
+    private var wakeListening = false: FishAudioTts
     private val prefs by lazy { getSharedPreferences("jarvis_settings", MODE_PRIVATE) }
     private val backgroundExecutor = Executors.newFixedThreadPool(3)
     private val mainHandler = Handler(Looper.getMainLooper())
@@ -50,6 +52,7 @@ class MainActivity : Activity() {
         gigaChat = GigaChatClient(this)
         selectedPersona = prefs.getString("persona", "J.A.R.V.I.S.") ?: "J.A.R.V.I.S."
         fishAudioTts = FishAudioTts(this)
+        memory = JarvisMemory(this)
         tts = TextToSpeech(this) { status ->
             if (status == TextToSpeech.SUCCESS) tts?.language = Locale("ru", "RU")
         }
@@ -81,6 +84,7 @@ class MainActivity : Activity() {
             override fun onPartialResults(partialResults: Bundle?) = Unit
             override fun onEvent(eventType: Int, params: Bundle?) = Unit
             override fun onError(error: Int) {
+                restartWakeListening()
                 runOnUiThread {
                     if (::webView.isInitialized) webView.evaluateJavascript("window.onJarvisSpeechResult && window.onJarvisSpeechResult('')", null)
                 }
@@ -88,6 +92,7 @@ class MainActivity : Activity() {
             override fun onResults(results: Bundle?) {
                 val text = results?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)?.firstOrNull() ?: return
                 val escaped = JSONObject.quote(text)
+                restartWakeListening()
                 runOnUiThread {
                     if (::webView.isInitialized) webView.evaluateJavascript("window.onJarvisSpeechResult && window.onJarvisSpeechResult($escaped)", null)
                 }
@@ -165,7 +170,8 @@ class MainActivity : Activity() {
 
     private fun sendToGigaChat(text: String) {
         backgroundExecutor.execute {
-            val answer = gigaChat.ask(text, selectedPersona)
+            val answer = gigaChat.ask(text, selectedPersona, memory.memoryContext())
+            memory.rememberTurn(text, answer)
             runOnUiThread {
                 if (::webView.isInitialized) {
                     val escaped = JSONObject.quote(answer)
@@ -174,6 +180,44 @@ class MainActivity : Activity() {
                 speak(answer)
             }
         }
+    }
+
+    private fun rememberUserName(text: String) {
+        val s = text.trim()
+        val lower = s.lowercase(Locale("ru", "RU"))
+        val marker = when { lower.startsWith("меня зовут ") -> "меня зовут "; lower.startsWith("моё имя ") -> "моё имя "; lower.startsWith("мое имя ") -> "мое имя "; else -> "" }
+        if (marker.isNotEmpty()) memory.setUserName(s.substring(marker.length).trim().split(" ").firstOrNull().orEmpty())
+    }
+
+    private fun startWakeListening() {
+        if (ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) return
+        if (speechRecognizer == null || wakeListening) return
+        wakeListening = true
+        try {
+            val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
+                putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
+                putExtra(RecognizerIntent.EXTRA_LANGUAGE, "ru-RU")
+                putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, 3)
+                putExtra(RecognizerIntent.EXTRA_PARTIAL_RESULTS, false)
+            }
+            speechRecognizer?.startListening(intent)
+        } catch (_: Exception) { wakeListening = false }
+    }
+
+    private fun restartWakeListening() {
+        wakeListening = false
+        mainHandler.postDelayed({ startWakeListening() }, 350)
+    }
+
+    override fun onResume() {
+        super.onResume()
+        startWakeListening()
+    }
+
+    override fun onPause() {
+        wakeListening = false
+        speechRecognizer?.cancel()
+        super.onPause()
     }
 
     private fun checkForUpdates(manual: Boolean) {
@@ -279,6 +323,8 @@ class MainActivity : Activity() {
 
     inner class AndroidBridge {
         @JavascriptInterface fun command(text: String): String {
+            rememberUserName(text)
+            memory.recordHabit(text)
             val normalized = text.trim().lowercase()
             if (
                 normalized.contains("кто мне написал") ||
@@ -286,7 +332,11 @@ class MainActivity : Activity() {
                 normalized.contains("прочитай сообщение") ||
                 normalized.contains("новые сообщения")
             ) return notificationReply()
-            if (router.canHandle(text)) return router.execute(text)
+            if (router.canHandle(text)) {
+                val result = router.execute(text)
+                memory.rememberTurn(text, result)
+                return result
+            }
             sendToGigaChat(text)
             return ""
         }
@@ -294,6 +344,9 @@ class MainActivity : Activity() {
         @JavascriptInterface fun startListening() { runOnUiThread { this@MainActivity.startListening() } }
         @JavascriptInterface fun speak(text: String) { runOnUiThread { this@MainActivity.speak(text) } }
         @JavascriptInterface fun setPersona(name: String) { selectedPersona = name; prefs.edit().putString("persona", name).apply() }
+
+        @JavascriptInterface fun getUserName(): String = memory.getUserName()
+        @JavascriptInterface fun getMemorySummary(): String = memory.memoryContext()
 
         @JavascriptInterface
         fun setApiKeys(fish: String, giga: String): String {
