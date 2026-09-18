@@ -42,6 +42,7 @@ class MainActivity : Activity() {
     private lateinit var fishAudioTts: FishAudioTts
     private lateinit var memory: JarvisMemory
     private var wakeListening = false
+    private var manualListening = false
     private val prefs by lazy { getSharedPreferences("jarvis_settings", MODE_PRIVATE) }
     private val backgroundExecutor = Executors.newFixedThreadPool(3)
     private val mainHandler = Handler(Looper.getMainLooper())
@@ -84,13 +85,18 @@ class MainActivity : Activity() {
             override fun onPartialResults(partialResults: Bundle?) = Unit
             override fun onEvent(eventType: Int, params: Bundle?) = Unit
             override fun onError(error: Int) {
+                val wasManual = manualListening
+                manualListening = false
                 restartWakeListening()
-                runOnUiThread {
-                    if (::webView.isInitialized) webView.evaluateJavascript("window.onJarvisSpeechResult && window.onJarvisSpeechResult('')", null)
+                if (wasManual) {
+                    runOnUiThread {
+                        if (::webView.isInitialized) webView.evaluateJavascript("window.onJarvisSpeechResult && window.onJarvisSpeechResult('')", null)
+                    }
                 }
             }
             override fun onResults(results: Bundle?) {
                 val text = results?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)?.firstOrNull() ?: return
+                manualListening = false
                 val escaped = JSONObject.quote(text)
                 restartWakeListening()
                 runOnUiThread {
@@ -102,6 +108,7 @@ class MainActivity : Activity() {
 
     private fun startListening() {
         wakeListening = false
+        manualListening = true
         speechRecognizer?.cancel()
         if (ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {
             requestRuntimePermissions()
