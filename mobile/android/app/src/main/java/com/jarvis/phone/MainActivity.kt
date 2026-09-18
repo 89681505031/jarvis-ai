@@ -526,7 +526,7 @@ class MainActivity : Activity() {
         }
 
         @JavascriptInterface fun clearMessages(): String {
-            JarvisNotificationService.clear()
+            JarvisNotificationService.clear(this@MainActivity)
             return "История уведомлений J.A.R.V.I.S. очищена."
         }
 
