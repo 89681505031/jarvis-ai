@@ -74,6 +74,11 @@ jobs:
           set -e
           TAG="mobile-v${JARVIS_VERSION_NAME}"
           APK="mobile/android/app/build/outputs/apk/debug/jarvis-phone.apk"
-          gh release create "$TAG" "$APK" --title "JARVIS Android ${JARVIS_VERSION_NAME}" --notes "Автоматическая сборка JARVIS Android. Версия ${JARVIS_VERSION_NAME}." || {
+
+          if gh release view "$TAG" >/dev/null 2>&1; then
             gh release upload "$TAG" "$APK" --clobber
-          }
+          else
+            gh release create "$TAG" "$APK" \
+              --title "JARVIS Android ${JARVIS_VERSION_NAME}" \
+              --notes "Автоматическая сборка JARVIS Android. Версия ${JARVIS_VERSION_NAME}."
+          fi
