@@ -21,8 +21,8 @@ android {
         applicationId = "com.jarvis.phone"
         minSdk = 26
         targetSdk = 35
-        versionCode = 1
-        versionName = "0.1.0"
+        versionCode = System.getenv("JARVIS_VERSION_CODE")?.toIntOrNull() ?: 2
+        versionName = System.getenv("JARVIS_VERSION_NAME") ?: "0.2.0"
     }
 
     compileOptions {
