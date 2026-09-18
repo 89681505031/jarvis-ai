@@ -15,6 +15,7 @@ import android.speech.tts.TextToSpeech
 import android.webkit.JavascriptInterface
 import android.webkit.WebView
 import android.webkit.WebViewClient
+import android.view.MotionEvent
 import android.widget.Toast
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
@@ -60,14 +61,23 @@ class MainActivity : Activity() {
             settings.domStorageEnabled = true
             settings.allowFileAccess = true
             settings.allowContentAccess = true
+            settings.loadsImagesAutomatically = true
+            settings.javaScriptCanOpenWindowsAutomatically = false
             isFocusable = true
             isFocusableInTouchMode = true
-            requestFocus()
+            isClickable = true
+            isLongClickable = true
+            setOnTouchListener { _, event ->
+                if (event.action == MotionEvent.ACTION_DOWN) {
+                    requestFocus()
+                }
+                false
+            }
             webViewClient = WebViewClient()
             addJavascriptInterface(AndroidBridge(), "AndroidJarvis")
-            loadUrl("file:///android_asset/index.html")
         }
         setContentView(webView)
+        webView.loadUrl("file:///android_asset/index.html")
         requestRuntimePermissions()
         mainHandler.postDelayed({ checkForUpdates(false) }, 1800)
     }
@@ -121,8 +131,11 @@ class MainActivity : Activity() {
         val apiKey = prefs.getString("fish_api_key", "").orEmpty()
         val fishVoice = FishAudioTts.voiceIdFor(selectedPersona)
         if (apiKey.isNotBlank() && !fishVoice.isNullOrBlank()) {
-            fishAudioTts.speak(text, selectedPersona) {
-                runOnUiThread { tts?.speak(text, TextToSpeech.QUEUE_FLUSH, null, "jarvis-response-fallback") }
+            fishAudioTts.speak(text, selectedPersona) { _ ->
+                runOnUiThread {
+                    tts?.speak(text, TextToSpeech.QUEUE_FLUSH, null, "jarvis-response-fallback")
+                    Toast.makeText(this, "Fish Audio недоступен — использую системный голос.", Toast.LENGTH_SHORT).show()
+                }
             }
         } else {
             tts?.speak(text, TextToSpeech.QUEUE_FLUSH, null, "jarvis-response")
