@@ -21,6 +21,13 @@ class JarvisAccessibilityService : AccessibilityService() {
 
     override fun onInterrupt() = Unit
 
+    override fun onDestroy() {
+        if (instance === this) {
+            instance = null
+        }
+        super.onDestroy()
+    }
+
     fun clickText(text: String): Boolean {
         val root = rootInActiveWindow ?: return false
         return clickRecursive(root, text)
