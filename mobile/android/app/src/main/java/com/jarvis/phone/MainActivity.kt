@@ -15,7 +15,6 @@ import android.speech.tts.TextToSpeech
 import android.webkit.JavascriptInterface
 import android.webkit.WebView
 import android.webkit.WebViewClient
-import android.view.MotionEvent
 import android.widget.Toast
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
@@ -61,23 +60,11 @@ class MainActivity : Activity() {
             settings.domStorageEnabled = true
             settings.allowFileAccess = true
             settings.allowContentAccess = true
-            settings.loadsImagesAutomatically = true
-            settings.javaScriptCanOpenWindowsAutomatically = false
-            isFocusable = true
-            isFocusableInTouchMode = true
-            isClickable = true
-            isLongClickable = true
-            setOnTouchListener { _, event ->
-                if (event.action == MotionEvent.ACTION_DOWN) {
-                    requestFocus()
-                }
-                false
-            }
             webViewClient = WebViewClient()
             addJavascriptInterface(AndroidBridge(), "AndroidJarvis")
+            loadUrl("file:///android_asset/index.html")
         }
         setContentView(webView)
-        webView.loadUrl("file:///android_asset/index.html")
         requestRuntimePermissions()
         mainHandler.postDelayed({ checkForUpdates(false) }, 1800)
     }
