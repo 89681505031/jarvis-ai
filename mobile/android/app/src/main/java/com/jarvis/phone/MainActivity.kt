@@ -382,10 +382,10 @@ class MainActivity : Activity() {
         }.trim()
     }
 
-    private fun sendToGigaChat(text: String) {
+    private fun sendToGigaChat(text: String, memoryText: String = text) {
         backgroundExecutor.execute {
             val answer = gigaChat.ask(text, selectedPersona, memory.memoryContext())
-            memory.rememberTurn(text, answer)
+            memory.rememberTurn(memoryText, answer)
             runOnUiThread {
                 if (::webView.isInitialized) {
                     val escaped = JSONObject.quote(answer)
@@ -556,9 +556,10 @@ class MainActivity : Activity() {
 
     inner class AndroidBridge {
         @JavascriptInterface fun command(text: String): String {
-            rememberUserName(text)
-            memory.recordHabit(text)
-            val normalized = text.trim().lowercase()
+            val memoryText = text.substringAfter("Запрос пользователя: ", text).trim()
+            rememberUserName(memoryText)
+            memory.recordHabit(memoryText)
+            val normalized = memoryText.lowercase()
             if (
                 normalized.contains("кто мне написал") ||
                 normalized.contains("прочитай сообщения") ||
@@ -603,16 +604,16 @@ class MainActivity : Activity() {
                         }
                     }.trim()
                 }
-                memory.rememberTurn(text, answer)
+                memory.rememberTurn(memoryText, answer)
                 return answer
             }
 
             if (router.canHandle(text)) {
                 val result = router.execute(text)
-                memory.rememberTurn(text, result)
+                memory.rememberTurn(memoryText, result)
                 return result
             }
-            sendToGigaChat(text)
+            sendToGigaChat(text, memoryText)
             return ""
         }
 
