@@ -28,7 +28,7 @@ function sendCommand(textOverride){
 }
 function startListening(){
   if(!(window.AndroidJarvis&&typeof window.AndroidJarvis.startListening==='function')){showMessage('Голосовой ввод доступен в APK JARVIS.');return}
-  state.waitingForCommand=false;showMessage('Слушаю…');window.AndroidJarvis.startListening();
+  state.waitingForCommand=true;showMessage('Слушаю…');window.AndroidJarvis.startListening();
 }
 function onSpeechResult(text){
   if(!text){showMessage('Не удалось распознать речь.');return}
@@ -60,6 +60,7 @@ function onSpeechResult(text){
 window.onJarvisSpeechResult=onSpeechResult;
 window.onGigaChatResult=function(text){showMessage(text)};
 
+function filterApps(){const q=(document.getElementById('appsSearch')?.value||'').trim().toLowerCase();document.querySelectorAll('#appsList .app-row').forEach(row=>{const n=(row.querySelector('span')?.textContent||'').toLowerCase();row.hidden=!!q&&!n.includes(q)})}
 function loadApps(){
   if(!(window.AndroidJarvis&&typeof window.AndroidJarvis.listApps==='function')){appsList.innerHTML='<div class="app-empty">Список приложений доступен внутри APK JARVIS.</div>';return}
   try{
@@ -106,7 +107,7 @@ modeNav.addEventListener('click',()=>{state.mode=state.mode==='phone'?'pc':'phon
 appsNav.addEventListener('click',toggleApps);
 commandsNav.addEventListener('click',toggleCommands);
 settingsNav.addEventListener('click',toggleSettings);
-refreshApps.addEventListener('click',loadApps);
+refreshApps.addEventListener('click',loadApps);document.getElementById('appsSearch')?.addEventListener('input',filterApps);
 saveApiKeys.addEventListener('click',saveKeys);
 checkUpdates.addEventListener('click',askUpdates);
 send.addEventListener('click',()=>sendCommand());
