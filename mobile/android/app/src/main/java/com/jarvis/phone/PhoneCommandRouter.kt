@@ -25,7 +25,10 @@ class PhoneCommandRouter(private val context: Context) {
             lower.contains("включи свет") || lower.contains("выключи свет") ||
             lower.contains("увеличь громкость") || lower.contains("сделай громче") ||
             lower.contains("уменьши громкость") || lower.contains("сделай тише") ||
-            lower.contains("выключи звук") || lower.contains("включи звук")
+            lower.contains("выключи звук") || lower.contains("включи звук") ||
+            lower == "назад" || lower.contains("вернись назад") ||
+            lower == "домой" || lower.contains("на главный экран") ||
+            lower.contains("открой последние приложения") || lower.contains("покажи последние приложения")
     }
 
     fun execute(raw: String): String {
@@ -50,6 +53,9 @@ class PhoneCommandRouter(private val context: Context) {
             lower.contains("уменьши громкость") || lower.contains("сделай тише") -> changeVolume(false)
             lower.contains("выключи звук") -> setMute(true)
             lower.contains("включи звук") -> setMute(false)
+            lower == "назад" || lower.contains("вернись назад") -> accessibilityAction(android.accessibilityservice.AccessibilityService.GLOBAL_ACTION_BACK, "Возвращаюсь назад.")
+            lower == "домой" || lower.contains("на главный экран") -> accessibilityAction(android.accessibilityservice.AccessibilityService.GLOBAL_ACTION_HOME, "Переход на главный экран.")
+            lower.contains("открой последние приложения") || lower.contains("покажи последние приложения") -> accessibilityAction(android.accessibilityservice.AccessibilityService.GLOBAL_ACTION_RECENTS, "Открываю последние приложения.")
             lower.startsWith("открой ") -> openAllowedApp(command.substringAfter("открой ").trim())
             else -> "Команда PHONE MODE пока не подключена: $command"
         }
@@ -130,6 +136,16 @@ class PhoneCommandRouter(private val context: Context) {
             if (muted) "Звук выключен." else "Звук включён."
         } catch (_: Exception) {
             "Не удалось изменить состояние звука."
+        }
+    }
+
+    private fun accessibilityAction(action: Int, successMessage: String): String {
+        val service = JarvisAccessibilityService.instance
+            ?: return "Для этой команды включите J.A.R.V.I.S. в специальных возможностях Android."
+        return if (service.performGlobalAction(action)) {
+            successMessage
+        } else {
+            "Не удалось выполнить системное действие."
         }
     }
 
