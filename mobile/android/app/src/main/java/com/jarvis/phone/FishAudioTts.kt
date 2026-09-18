@@ -34,7 +34,12 @@ class FishAudioTts(private val context: Context) {
     private val mainHandler = Handler(Looper.getMainLooper())
     private var player: MediaPlayer? = null
 
-    fun speak(text: String, persona: String, onError: ((String) -> Unit)? = null) {
+    fun speak(
+        text: String,
+        persona: String,
+        onError: ((String) -> Unit)? = null,
+        onComplete: (() -> Unit)? = null
+    ) {
         val prefs = context.getSharedPreferences("jarvis_settings", Context.MODE_PRIVATE)
         val apiKey = prefs.getString("fish_api_key", "").orEmpty().trim()
         val voiceId = voiceIdFor(persona)
@@ -73,8 +78,19 @@ class FishAudioTts(private val context: Context) {
                         player?.release()
                         player = MediaPlayer().apply {
                             setDataSource(file.absolutePath)
-                            setOnCompletionListener { release(); player = null; file.delete() }
-                            setOnErrorListener { _, _, _ -> release(); player = null; file.delete(); true }
+                            setOnCompletionListener {
+                                release()
+                                player = null
+                                file.delete()
+                                onComplete?.invoke()
+                            }
+                            setOnErrorListener { _, _, _ ->
+                                release()
+                                player = null
+                                file.delete()
+                                onError?.invoke("Fish Audio playback error")
+                                true
+                            }
                             setOnPreparedListener { start() }
                             prepareAsync()
                         }
