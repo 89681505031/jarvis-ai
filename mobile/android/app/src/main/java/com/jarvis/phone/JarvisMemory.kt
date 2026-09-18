@@ -10,7 +10,7 @@ class JarvisMemory(context: Context) {
     private val lock = Any()
 
     fun setUserName(name: String) {
-        val clean = name.trim().replace(Regex("\\s+"), " ")
+        val clean = name.trim().replace(Regex("\s+"), " ")
         if (clean.isNotBlank()) prefs.edit().putString("user_name", clean).apply()
     }
 
@@ -64,10 +64,13 @@ class JarvisMemory(context: Context) {
             "ai" to "вопросы ИИ",
             "other" to "другие команды"
         )
-        return (0 until habits.length())
-            .map { key -> key to habits.optInt(key, 0) }
-            .sortedByDescending { it.second }
-            .joinToString(", ") { (key, count) -> (names[key] ?: key) + ": " + count }
+        val parts = mutableListOf<String>()
+        val keys = habits.keys()
+        while (keys.hasNext()) {
+            val key = keys.next()
+            parts += (names[key] ?: key) + ": " + habits.optInt(key, 0)
+        }
+        return parts.sortedByDescending { it.substringAfterLast(": ").toIntOrNull() ?: 0 }.joinToString(", ")
     }
 
     fun memoryContext(): String {
