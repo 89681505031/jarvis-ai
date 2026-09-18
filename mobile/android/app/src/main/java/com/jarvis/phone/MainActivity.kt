@@ -47,6 +47,7 @@ class MainActivity : Activity() {
     private var conversationUntil = 0L
     private var isSpeaking = false
     private var resumeListeningAfterSpeech = false
+    private var activityResumed = false
     private val conversationResumeDurationMs = 12_000L
     private val prefs by lazy { getSharedPreferences("jarvis_settings", MODE_PRIVATE) }
     private val backgroundExecutor = Executors.newFixedThreadPool(3)
@@ -156,7 +157,7 @@ class MainActivity : Activity() {
     }
 
     private fun startConversationRecognition() {
-        if (isSpeaking) return
+        if (!activityResumed || isSpeaking) return
         if (conversationUntil <= System.currentTimeMillis() || speechRecognizer == null) {
             conversationUntil = 0L
             restartWakeListening()
@@ -326,7 +327,7 @@ class MainActivity : Activity() {
     }
 
     private fun startWakeListening() {
-        if (isSpeaking) return
+        if (!activityResumed || isSpeaking) return
         if (ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) return
         if (speechRecognizer == null || wakeListening) return
         wakeListening = true
@@ -353,12 +354,15 @@ class MainActivity : Activity() {
 
     override fun onResume() {
         super.onResume()
+        activityResumed = true
         startWakeListening()
     }
 
     override fun onPause() {
+        activityResumed = false
         wakeListening = false
         conversationUntil = 0L
+        mainHandler.removeCallbacksAndMessages(null)
         speechRecognizer?.cancel()
         super.onPause()
     }
@@ -547,6 +551,8 @@ class MainActivity : Activity() {
     }
 
     override fun onDestroy() {
+        activityResumed = false
+        mainHandler.removeCallbacksAndMessages(null)
         backgroundExecutor.shutdownNow()
         speechRecognizer?.destroy()
         tts?.stop()
