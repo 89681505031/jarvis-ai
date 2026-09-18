@@ -25,30 +25,52 @@ class GigaChatClient(private val context: Context) {
         if (key.isBlank()) return "В настройках J.A.R.V.I.S. не указан API ключ GigaChat."
 
         return try {
-            val token = getToken(key)
-            val body = JSONObject().apply {
-                put("model", MODEL)
-                put("messages", JSONArray().apply {
-                    put(JSONObject().apply {
-                        put("role", "system")
-                        put("content", systemPrompt(persona) + if (memoryContext.isNotBlank()) "\n\nПамять пользователя:\n" + memoryContext else "")
-                    })
-                    put(JSONObject().apply {
-                        put("role", "user")
-                        put("content", userText)
-                    })
-                })
-            }
-            val response = postJson(CHAT_URL, body.toString(), mapOf(
-                "Authorization" to "Bearer $token",
-                "Content-Type" to "application/json",
-                "Accept" to "application/json"
-            ))
-            JSONObject(response).optJSONArray("choices")?.optJSONObject(0)
-                ?.optJSONObject("message")?.optString("content")?.trim()
-                ?.takeIf { it.isNotBlank() } ?: "GigaChat не вернул текст ответа."
+            askOnce(key, userText, persona, memoryContext)
         } catch (e: Exception) {
-            "Не удалось получить ответ GigaChat: ${e.message ?: "ошибка соединения"}"
+            // The OAuth token can be rejected server-side before its local expiry time.
+            // Refresh once on HTTP 401 instead of making the user re-enter the API key.
+            if (e.message?.contains("HTTP 401") == true) {
+                invalidateToken(key)
+                try {
+                    askOnce(key, userText, persona, memoryContext)
+                } catch (retry: Exception) {
+                    "Не удалось получить ответ GigaChat: ${retry.message ?: "ошибка соединения"}"
+                }
+            } else {
+                "Не удалось получить ответ GigaChat: ${e.message ?: "ошибка соединения"}"
+            }
+        }
+    }
+
+    private fun askOnce(key: String, userText: String, persona: String, memoryContext: String): String {
+        val token = getToken(key)
+        val body = JSONObject().apply {
+            put("model", MODEL)
+            put("messages", JSONArray().apply {
+                put(JSONObject().apply {
+                    put("role", "system")
+                    put("content", systemPrompt(persona) + if (memoryContext.isNotBlank()) "\n\nПамять пользователя:\n" + memoryContext else "")
+                })
+                put(JSONObject().apply {
+                    put("role", "user")
+                    put("content", userText)
+                })
+            })
+        }
+        val response = postJson(CHAT_URL, body.toString(), mapOf(
+            "Authorization" to "Bearer $token",
+            "Content-Type" to "application/json",
+            "Accept" to "application/json"
+        ))
+        return JSONObject(response).optJSONArray("choices")?.optJSONObject(0)
+            ?.optJSONObject("message")?.optString("content")?.trim()
+            ?.takeIf { it.isNotBlank() } ?: "GigaChat не вернул текст ответа."
+    }
+
+    @Synchronized private fun invalidateToken(key: String) {
+        if (tokenKeyFingerprint == key.hashCode()) {
+            accessToken = null
+            tokenExpiresAt = 0L
         }
     }
 
