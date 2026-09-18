@@ -47,7 +47,10 @@ class JarvisMemory(context: Context) {
         synchronized(lock) {
             val habits = JSONObject(prefs.getString("habits", "{}"))
             habits.put(category, habits.optInt(category, 0) + 1)
-            prefs.edit().putString("habits", habits.toString()).apply()
+            val commands = JSONObject(prefs.getString("habit_commands", "{}"))
+            val key = text.trim().lowercase(Locale("ru", "RU")).replace(Regex("\\s+"), " ").take(120)
+            if (key.isNotBlank()) commands.put(key, commands.optInt(key, 0) + 1)
+            prefs.edit().putString("habits", habits.toString()).putString("habit_commands", commands.toString()).apply()
         }
     }
 
@@ -77,9 +80,15 @@ class JarvisMemory(context: Context) {
         val name = getUserName()
         val dialogues = recentDialogues()
         val habits = habitsSummary()
+        val commands = JSONObject(prefs.getString("habit_commands", "{}"))
+        val commandKeys = commands.keys()
+        val frequent = mutableListOf<Pair<String, Int>>()
+        while (commandKeys.hasNext()) { val key = commandKeys.next(); frequent += Pair(key, commands.optInt(key, 0)) }
+        val frequentText = frequent.sortedByDescending { pair -> pair.second }.take(5).joinToString(", ") { pair -> "«" + pair.first + "» (" + pair.second + " раз)" }
         return buildString {
             if (name.isNotBlank()) append("Имя пользователя: ").append(name).append("\n")
             append("Наблюдаемые привычки использования телефона: ").append(habits).append("\n")
+            if (frequentText.isNotBlank()) append("Частые команды пользователя: ").append(frequentText).append("\n")
             if (dialogues.isNotEmpty()) {
                 append("Последние ").append(dialogues.size).append(" диалогов:\n")
                 dialogues.forEachIndexed { index, pair ->
