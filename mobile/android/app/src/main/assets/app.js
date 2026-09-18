@@ -19,8 +19,11 @@ function sendCommand(textOverride){
   if(state.mode==='phone'&&window.AndroidJarvis){
     try{
       const result=window.AndroidJarvis.command(text);
-      if(result)showMessage(result);
-      else showMessage('Обрабатываю запрос…');
+      if(result){
+        showMessage(result);
+        if(typeof window.AndroidJarvis.speak==='function')window.AndroidJarvis.speak(result);
+        if(typeof window.AndroidJarvis.startConversationWindow==='function')window.AndroidJarvis.startConversationWindow(12);
+      }else showMessage('Обрабатываю запрос…');
     }catch(e){showMessage('Ошибка выполнения команды: '+e.message)}
   }else if(state.mode==='phone')showMessage('PHONE MODE работает в APK JARVIS.');
   else showMessage('PC MODE: подключение к компьютеру будет следующим этапом.');
@@ -54,7 +57,15 @@ function onSpeechResult(text){
     return;
   }
   const commandText=clean.replace(wake,'').trim();
-  if(!commandText){state.waitingForCommand=true;showMessage('Слушаю…');return}
+  if(!commandText){
+    state.waitingForCommand=true;
+    showMessage('Слушаю…');
+    if(window.AndroidJarvis&&typeof window.AndroidJarvis.speak==='function')window.AndroidJarvis.speak('Слушаю');
+    if(window.AndroidJarvis&&typeof window.AndroidJarvis.startConversationWindow==='function')window.AndroidJarvis.startConversationWindow(10);
+    return
+  }
+  if(window.AndroidJarvis&&typeof window.AndroidJarvis.speak==='function')window.AndroidJarvis.speak('Да');
+  if(window.AndroidJarvis&&typeof window.AndroidJarvis.startConversationWindow==='function')window.AndroidJarvis.startConversationWindow(10);
   sendCommand(commandText);
 }
 window.onJarvisSpeechResult=onSpeechResult;
