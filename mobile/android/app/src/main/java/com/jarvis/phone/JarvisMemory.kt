@@ -75,6 +75,42 @@ class JarvisMemory(context: Context) {
         }
     }
 
+    fun rememberFact(text: String): Boolean = synchronized(lock) {
+        val clean = text.trim().replace(Regex("\\s+"), " ").trimEnd('.', '!', '?')
+        if (clean.length < 2) return false
+        val fact = if (clean.startsWith("Пользователь ", ignoreCase = true)) clean else "Пользователь: $clean"
+        val facts = JSONArray(prefs.getString("facts", "[]"))
+        val next = JSONArray()
+        for (i in 0 until facts.length()) {
+            val existing = facts.optString(i).trim()
+            if (existing.isNotBlank() && !existing.equals(fact, ignoreCase = true)) next.put(existing)
+        }
+        next.put(fact)
+        val start = maxOf(0, next.length() - 30)
+        val limited = JSONArray()
+        for (i in start until next.length()) limited.put(next.optString(i))
+        prefs.edit().putString("facts", limited.toString()).apply()
+        true
+    }
+
+    fun forgetFact(query: String): Boolean = synchronized(lock) {
+        val needle = normalize(query).trim()
+        if (needle.isBlank()) return false
+        val facts = JSONArray(prefs.getString("facts", "[]"))
+        val next = JSONArray()
+        var removed = false
+        for (i in 0 until facts.length()) {
+            val existing = facts.optString(i).trim()
+            if (!removed && normalize(existing).contains(needle)) {
+                removed = true
+            } else if (existing.isNotBlank()) {
+                next.put(existing)
+            }
+        }
+        if (removed) prefs.edit().putString("facts", next.toString()).apply()
+        removed
+    }
+
     fun forgetLastFact(): Boolean = synchronized(lock) {
         val facts = JSONArray(prefs.getString("facts", "[]"))
         if (facts.length() == 0) return false
@@ -129,7 +165,8 @@ class JarvisMemory(context: Context) {
         val frequentText = frequent.sortedByDescending { pair -> pair.second }.take(5).joinToString(", ") { pair -> "«" + pair.first + "» (" + pair.second + " раз)" }
         return buildString {
             if (name.isNotBlank()) append("Имя пользователя: ").append(name).append("\n")
-            append("Наблюдаемые привычки использования телефона: ").append(habits).append("\n")\n            val facts = factsSummary()\n            if (facts != "Пока важных фактов обо мне не сохранено.") append(facts).append("\n")
+            append("Наблюдаемые привычки использования телефона: ").append(habits).append("\n")
+            val facts = factsSummary()\n            if (facts != "Пока важных фактов обо мне не сохранено.") append(facts).append("\n")
             if (frequentText.isNotBlank()) append("Частые команды пользователя: ").append(frequentText).append("\n")
             if (dialogues.isNotEmpty()) {
                 append("Последние ").append(dialogues.size).append(" диалогов:\n")
