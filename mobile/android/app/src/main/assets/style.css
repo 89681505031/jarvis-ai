@@ -26,6 +26,11 @@ button,input{font:inherit}button{cursor:pointer}
 .bottom-nav button{border:1px solid #1a2a35;background:#0a1118;color:#9aaab5;border-radius:13px;padding:11px 5px;min-height:58px;font-size:12px;font-weight:700}
 .bottom-nav button.active{color:#9fe4ff}.touch-button{user-select:none;-webkit-user-select:none;-webkit-touch-callout:none}.touch-button:active{transform:scale(.97)}
 @media(max-width:420px){.brand{font-size:20px}.mode{font-size:11px}.orb-wrap{min-height:260px}.orb{width:145px;height:145px}.bottom-nav button{font-size:11px;padding-left:2px;padding-right:2px}}
-
 .window-panel{position:fixed;top:12px;left:50%;transform:translateX(-50%);width:min(680px,calc(100% - 24px));max-height:calc(100vh - 110px);overflow:auto;z-index:60;box-shadow:0 20px 60px rgba(0,0,0,.65)}
 .apps-search{width:100%;background:#05080c;border:1px solid #243746;border-radius:14px;padding:13px;color:#fff;outline:none;min-height:52px;margin-bottom:10px}
+#registration{position:fixed;inset:0;z-index:1000;display:flex;align-items:center;justify-content:center;padding:22px;background:radial-gradient(circle at top,#12354a 0%,#05070a 58%)}
+#registration[hidden]{display:none!important}
+#registration .registration-card{width:min(480px,100%);padding:28px 22px;border:1px solid #31566b;border-radius:26px;background:linear-gradient(145deg,#101d29,#070b11);box-shadow:0 24px 90px rgba(0,0,0,.8)}
+#registration h1{margin:0 0 10px;text-align:center;color:#9fe4ff;letter-spacing:2px;font-size:25px}#registration p{text-align:center;color:#8da7b8;margin:0 0 24px;line-height:1.5}
+#registration input{display:block;width:100%;margin:10px 0;padding:15px;border-radius:13px;border:1px solid #29495b;background:#05080c;color:#fff;min-height:52px}
+#saveProfile{width:100%;margin-top:14px;padding:16px;border:1px solid #6bc9ef;border-radius:14px;background:#12384c;color:#c9f2ff;font-weight:700;min-height:54px}
