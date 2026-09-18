@@ -29,7 +29,7 @@ import java.util.concurrent.Executors
 
 class MainActivity : Activity() {
     companion object {
-        private const val GITHUB_LATEST_RELEASE = "https://api.github.com/repos/89681505031/jarvis-ai/releases/latest"
+        private const val GITHUB_RELEASES = "https://api.github.com/repos/89681505031/jarvis-ai/releases?per_page=20"
         private const val APK_ASSET_NAME = "jarvis-phone.apk"
     }
 
@@ -179,7 +179,7 @@ class MainActivity : Activity() {
     private fun checkForUpdates(manual: Boolean) {
         backgroundExecutor.execute {
             try {
-                val connection = (URL(GITHUB_LATEST_RELEASE).openConnection() as HttpURLConnection).apply {
+                val connection = (URL(GITHUB_RELEASES).openConnection() as HttpURLConnection).apply {
                     requestMethod = "GET"
                     connectTimeout = 10000
                     readTimeout = 15000
@@ -191,18 +191,35 @@ class MainActivity : Activity() {
                 connection.disconnect()
                 if (code !in 200..299) throw IllegalStateException("HTTP $code")
 
-                val release = JSONObject(body)
-                val tag = release.optString("tag_name")
-                val latestCode = tag.substringAfterLast(".").toIntOrNull() ?: 0
-                val asset = release.optJSONArray("assets")?.let { assets ->
-                    (0 until assets.length()).map { assets.optJSONObject(it) }.firstOrNull {
+                val releases = org.json.JSONArray(body)
+                var newestCode = BuildConfig.VERSION_CODE
+                var newestRelease: JSONObject? = null
+                var newestDownloadUrl = ""
+
+                for (i in 0 until releases.length()) {
+                    val candidate = releases.optJSONObject(i) ?: continue
+                    if (candidate.optBoolean("draft") || candidate.optBoolean("prerelease")) continue
+                    val assets = candidate.optJSONArray("assets") ?: continue
+                    val asset = (0 until assets.length()).map { assets.optJSONObject(it) }.firstOrNull {
                         it?.optString("name") == APK_ASSET_NAME
+                    } ?: continue
+                    val tag = candidate.optString("tag_name")
+                    val code = tag.substringAfterLast(".").toIntOrNull() ?: continue
+                    if (code > newestCode) {
+                        newestCode = code
+                        newestRelease = candidate
+                        newestDownloadUrl = asset.optString("browser_download_url")
                     }
                 }
-                val downloadUrl = asset?.optString("browser_download_url").orEmpty()
 
-                if (latestCode > BuildConfig.VERSION_CODE && downloadUrl.isNotBlank()) {
-                    mainHandler.post { showUpdateDialog(release.optString("name", "Новая версия J.A.R.V.I.S."), downloadUrl) }
+                if (newestRelease != null && newestDownloadUrl.isNotBlank()) {
+                    val release = newestRelease!!
+                    mainHandler.post {
+                        showUpdateDialog(
+                            release.optString("name", "Новая версия J.A.R.V.I.S."),
+                            newestDownloadUrl
+                        )
+                    }
                 } else if (manual) {
                     mainHandler.post {
                         Toast.makeText(this, "У вас установлена последняя версия J.A.R.V.I.S.", Toast.LENGTH_SHORT).show()
