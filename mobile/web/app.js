@@ -59,10 +59,25 @@ function listenForCommand(){
   setTimeout(()=>{if(window.AndroidJarvis&&typeof window.AndroidJarvis.startListening==='function')window.AndroidJarvis.startListening()},900);
 }
 function onSpeechResult(text){
-  if(!text)return; const clean=text.trim(); const wake=/^(джарвис|jarvis)[,\s.!?]*/i;
+  if(!text)return;
+  const clean=text.trim();
+  const wake=/^(джарвис|jarvis|астра|astra|луна|luna|сайбер|cyber|терра|terra)[,\s.!?]*/i;
   if(state.waitingForCommand){sendCommand(clean);return}
-  if(wake.test(clean)){const commandText=clean.replace(wake,'').trim();if(!commandText){listenForCommand();return}sendCommand(commandText);return}
-  sendCommand(clean);
+  if(!wake.test(clean))return;
+  const spokenWake=clean.match(wake)?.[1]?.toLowerCase()||'';
+  const active=String(state.persona||'J.A.R.V.I.S.').toLowerCase().replace(/[^a-zа-яё]/g,'');
+  const aliases={'джарвис':'jarvis','jarvis':'jarvis','астра':'astra','astra':'astra','луна':'luna','luna':'luna','сайбер':'cyber','cyber':'cyber','терра':'terra','terra':'terra'};
+  const activeKey=aliases[active]||'jarvis';
+  const spokenKey=aliases[spokenWake]||spokenWake;
+  if(spokenKey!==activeKey){
+    const activeName=state.persona==='J.A.R.V.I.S.'?'Джарвис':state.persona;
+    showMessage('Я не '+spokenWake+', я '+activeName+'.');
+    if(window.AndroidJarvis&&typeof window.AndroidJarvis.speak==='function')window.AndroidJarvis.speak('Я не '+spokenWake+', я '+activeName+'.');
+    return;
+  }
+  const commandText=clean.replace(wake,'').trim();
+  if(!commandText){listenForCommand();return}
+  sendCommand(commandText);
 }
 function onGigaChatResult(text){showMessage(text||'GigaChat не вернул ответ.');}
 window.onJarvisSpeechResult=onSpeechResult;
