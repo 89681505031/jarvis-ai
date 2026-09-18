@@ -34,7 +34,11 @@ class JarvisAccessibilityService : AccessibilityService() {
     }
 
     private fun clickRecursive(node: AccessibilityNodeInfo, text: String): Boolean {
-        if (node.text?.toString()?.equals(text, ignoreCase = true) == true && node.isClickable) {
+        val nodeText = node.text?.toString()
+        val description = node.contentDescription?.toString()
+        if ((nodeText?.equals(text, ignoreCase = true) == true ||
+                    description?.equals(text, ignoreCase = true) == true) &&
+            node.isClickable) {
             return node.performAction(AccessibilityNodeInfo.ACTION_CLICK)
         }
         for (i in 0 until node.childCount) {
