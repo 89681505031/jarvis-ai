@@ -17,7 +17,7 @@ class PhoneCommandRouter(private val context: Context) {
     fun canHandle(raw: String): Boolean {
         val lower = raw.trim().lowercase(Locale("ru", "RU"))
         return lower == "открой браузер" || lower.contains("открой браузер") ||
-            lower.contains("открой настройки") || lower.contains("открой камеру") ||
+            lower.contains("открой настройки") || lower.contains("открой wi-fi") || lower.contains("открой wifi") || lower.contains("открой вай фай") || lower.contains("открой bluetooth") || lower.contains("открой блютуз") || lower.contains("открой режим полета") || lower.contains("открой авиарежим") || lower.contains("открой камеру") ||
             lower.startsWith("найди в интернете") || lower.startsWith("позвони ") ||
             lower.contains("кто звонил") || lower.contains("пропущенные вызовы") ||
             lower.startsWith("открой ") ||
@@ -36,6 +36,18 @@ class PhoneCommandRouter(private val context: Context) {
         val lower = command.lowercase(Locale("ru", "RU"))
         return when {
             lower == "открой браузер" || lower.contains("открой браузер") -> openBrowser()
+            lower.contains("открой wi-fi") || lower.contains("открой wifi") || lower.contains("открой вай фай") -> {
+                context.startActivity(Intent(Settings.ACTION_WIFI_SETTINGS).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+                "Открываю настройки Wi-Fi."
+            }
+            lower.contains("открой bluetooth") || lower.contains("открой блютуз") -> {
+                context.startActivity(Intent(Settings.ACTION_BLUETOOTH_SETTINGS).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+                "Открываю настройки Bluetooth."
+            }
+            lower.contains("открой режим полета") || lower.contains("открой авиарежим") -> {
+                context.startActivity(Intent(Settings.ACTION_AIRPLANE_MODE_SETTINGS).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+                "Открываю настройки режима полёта."
+            }
             lower.contains("открой настройки") -> {
                 context.startActivity(Intent(Settings.ACTION_SETTINGS).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
                 "Открываю настройки телефона."
