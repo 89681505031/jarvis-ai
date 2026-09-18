@@ -108,7 +108,8 @@ class MainActivity : Activity() {
 
     private fun startListening() {
         wakeListening = false
-        manualListening = true
+        // Отмена фонового распознавания может вызвать onError. Это не ошибка ручного ввода.
+        manualListening = false
         speechRecognizer?.cancel()
         if (ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {
             requestRuntimePermissions()
@@ -118,6 +119,7 @@ class MainActivity : Activity() {
             Toast.makeText(this, "Голосовой ввод недоступен на этом устройстве.", Toast.LENGTH_SHORT).show()
             return
         }
+        manualListening = true
         val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
             putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
             putExtra(RecognizerIntent.EXTRA_LANGUAGE, "ru-RU")
