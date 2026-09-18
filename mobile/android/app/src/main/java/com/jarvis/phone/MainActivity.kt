@@ -223,12 +223,15 @@ class MainActivity : Activity() {
                         val fallbackId = "jarvis-response-fallback-${System.currentTimeMillis()}"
                         val fallbackTts = tts
                         if (fallbackTts != null) {
-                            fallbackTts.speak(
+                            val result = fallbackTts.speak(
                                 text,
                                 TextToSpeech.QUEUE_FLUSH,
                                 null,
                                 fallbackId
                             )
+                            if (result == TextToSpeech.ERROR) {
+                                finishSpeech()
+                            }
                             Toast.makeText(this, "Fish Audio недоступен — использую системный голос.", Toast.LENGTH_SHORT).show()
                         } else {
                             // If the system TTS is not initialized, do not leave JARVIS stuck in speaking mode.
