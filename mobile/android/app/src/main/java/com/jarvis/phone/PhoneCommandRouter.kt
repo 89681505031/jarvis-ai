@@ -27,9 +27,9 @@ class PhoneCommandRouter(private val context: Context) {
             lower.contains("увеличь громкость") || lower.contains("сделай громче") ||
             lower.contains("уменьши громкость") || lower.contains("сделай тише") ||
             lower.contains("выключи звук") || lower.contains("включи звук") ||
-            lower == "назад" || lower.contains("вернись назад") ||
-            lower == "вперед" || lower == "вперёд" || lower.contains("идти вперед") || lower.contains("идти вперёд") ||
-            lower == "домой" || lower.contains("на главный экран") ||
+            lower == "назад" || lower.contains("вернись назад") || lower.contains("вернуться назад") || lower.contains("перейди назад") ||
+            lower == "вперед" || lower == "вперёд" || lower.contains("идти вперед") || lower.contains("идти вперёд") || lower.contains("перейди вперед") || lower.contains("перейди вперёд") ||
+            lower == "домой" || lower == "главный экран" || lower.contains("на главный экран") || lower.contains("перейди домой") ||
             lower.contains("открой последние приложения") || lower.contains("покажи последние приложения")
     }
 
@@ -67,9 +67,9 @@ class PhoneCommandRouter(private val context: Context) {
             lower.contains("уменьши громкость") || lower.contains("сделай тише") -> changeVolume(false)
             lower.contains("выключи звук") -> setMute(true)
             lower.contains("включи звук") -> setMute(false)
-            lower == "назад" || lower.contains("вернись назад") -> goBack()
-            lower == "вперед" || lower == "вперёд" || lower.contains("идти вперед") || lower.contains("идти вперёд") -> goForward()
-            lower == "домой" || lower.contains("на главный экран") -> goHome()
+            lower == "назад" || lower.contains("вернись назад") || lower.contains("вернуться назад") || lower.contains("перейди назад") -> goBack()
+            lower == "вперед" || lower == "вперёд" || lower.contains("идти вперед") || lower.contains("идти вперёд") || lower.contains("перейди вперед") || lower.contains("перейди вперёд") -> goForward()
+            lower == "домой" || lower == "главный экран" || lower.contains("на главный экран") || lower.contains("перейди домой") -> goHome()
             lower.contains("открой последние приложения") || lower.contains("покажи последние приложения") -> accessibilityAction(android.accessibilityservice.AccessibilityService.GLOBAL_ACTION_RECENTS, "Открываю последние приложения.")
             lower.startsWith("открой ") -> openAllowedApp(command.substringAfter("открой ").trim())
             else -> "Команда PHONE MODE пока не подключена: $command"
