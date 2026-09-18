@@ -242,12 +242,24 @@ class MainActivity : Activity() {
                 onComplete = { finishSpeech() }
             )
         } else {
-            tts?.speak(
+            val systemTts = tts
+            if (systemTts == null) {
+                // TTS may still be initializing when the first response arrives.
+                // Do not leave voice recognition permanently blocked in speaking mode.
+                finishSpeech()
+                return
+            }
+            val result = systemTts.speak(
                 text,
                 TextToSpeech.QUEUE_FLUSH,
                 null,
                 "jarvis-response-${System.currentTimeMillis()}"
             )
+            if (result == TextToSpeech.ERROR) {
+                // Some devices report TTS failure synchronously. Recover the
+                // listening state instead of leaving JARVIS stuck in speaking mode.
+                finishSpeech()
+            }
         }
     }
 
