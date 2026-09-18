@@ -2,9 +2,12 @@ package com.jarvis.phone
 
 import android.Manifest
 import android.app.Activity
+import android.app.AlertDialog
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Bundle
+import android.os.Handler
+import android.os.Looper
 import android.speech.RecognitionListener
 import android.speech.RecognizerIntent
 import android.speech.SpeechRecognizer
@@ -15,12 +18,21 @@ import android.webkit.WebViewClient
 import android.widget.Toast
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
+import androidx.core.content.FileProvider
 import org.json.JSONArray
 import org.json.JSONObject
+import java.io.File
+import java.net.HttpURLConnection
+import java.net.URL
 import java.util.Locale
 import java.util.concurrent.Executors
 
 class MainActivity : Activity() {
+    companion object {
+        private const val GITHUB_LATEST_RELEASE = "https://api.github.com/repos/89681505031/jarvis-ai/releases/latest"
+        private const val APK_ASSET_NAME = "jarvis-phone.apk"
+    }
+
     private lateinit var webView: WebView
     private lateinit var router: PhoneCommandRouter
     private lateinit var gigaChat: GigaChatClient
@@ -29,7 +41,8 @@ class MainActivity : Activity() {
     private var selectedPersona = "J.A.R.V.I.S."
     private lateinit var fishAudioTts: FishAudioTts
     private val prefs by lazy { getSharedPreferences("jarvis_settings", MODE_PRIVATE) }
-    private val backgroundExecutor = Executors.newSingleThreadExecutor()
+    private val backgroundExecutor = Executors.newFixedThreadPool(3)
+    private val mainHandler = Handler(Looper.getMainLooper())
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -37,17 +50,26 @@ class MainActivity : Activity() {
         gigaChat = GigaChatClient(this)
         selectedPersona = prefs.getString("persona", "J.A.R.V.I.S.") ?: "J.A.R.V.I.S."
         fishAudioTts = FishAudioTts(this)
-        tts = TextToSpeech(this) { status -> if (status == TextToSpeech.SUCCESS) tts?.language = Locale("ru", "RU") }
+        tts = TextToSpeech(this) { status ->
+            if (status == TextToSpeech.SUCCESS) tts?.language = Locale("ru", "RU")
+        }
         setupSpeechRecognizer()
+
         webView = WebView(this).apply {
             settings.javaScriptEnabled = true
             settings.domStorageEnabled = true
+            settings.allowFileAccess = true
+            settings.allowContentAccess = true
+            isFocusable = true
+            isFocusableInTouchMode = true
+            requestFocus()
             webViewClient = WebViewClient()
             addJavascriptInterface(AndroidBridge(), "AndroidJarvis")
             loadUrl("file:///android_asset/index.html")
         }
         setContentView(webView)
         requestRuntimePermissions()
+        mainHandler.postDelayed({ checkForUpdates(false) }, 1800)
     }
 
     private fun setupSpeechRecognizer() {
@@ -61,18 +83,30 @@ class MainActivity : Activity() {
             override fun onEndOfSpeech() = Unit
             override fun onPartialResults(partialResults: Bundle?) = Unit
             override fun onEvent(eventType: Int, params: Bundle?) = Unit
-            override fun onError(error: Int) { runOnUiThread { webView.evaluateJavascript("window.onJarvisSpeechResult && window.onJarvisSpeechResult('')", null) } }
+            override fun onError(error: Int) {
+                runOnUiThread {
+                    if (::webView.isInitialized) webView.evaluateJavascript("window.onJarvisSpeechResult && window.onJarvisSpeechResult('')", null)
+                }
+            }
             override fun onResults(results: Bundle?) {
                 val text = results?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)?.firstOrNull() ?: return
                 val escaped = JSONObject.quote(text)
-                runOnUiThread { webView.evaluateJavascript("window.onJarvisSpeechResult && window.onJarvisSpeechResult($escaped)", null) }
+                runOnUiThread {
+                    if (::webView.isInitialized) webView.evaluateJavascript("window.onJarvisSpeechResult && window.onJarvisSpeechResult($escaped)", null)
+                }
             }
         })
     }
 
     private fun startListening() {
-        if (ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) { requestRuntimePermissions(); return }
-        if (speechRecognizer == null) { Toast.makeText(this, "Голосовой ввод недоступен на этом устройстве.", Toast.LENGTH_SHORT).show(); return }
+        if (ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {
+            requestRuntimePermissions()
+            return
+        }
+        if (speechRecognizer == null) {
+            Toast.makeText(this, "Голосовой ввод недоступен на этом устройстве.", Toast.LENGTH_SHORT).show()
+            return
+        }
         val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
             putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
             putExtra(RecognizerIntent.EXTRA_LANGUAGE, "ru-RU")
@@ -87,14 +121,21 @@ class MainActivity : Activity() {
         val apiKey = prefs.getString("fish_api_key", "").orEmpty()
         val fishVoice = FishAudioTts.voiceIdFor(selectedPersona)
         if (apiKey.isNotBlank() && !fishVoice.isNullOrBlank()) {
-            fishAudioTts.speak(text, selectedPersona) { runOnUiThread { tts?.speak(text, TextToSpeech.QUEUE_FLUSH, null, "jarvis-response-fallback") } }
+            fishAudioTts.speak(text, selectedPersona) {
+                runOnUiThread { tts?.speak(text, TextToSpeech.QUEUE_FLUSH, null, "jarvis-response-fallback") }
+            }
         } else {
             tts?.speak(text, TextToSpeech.QUEUE_FLUSH, null, "jarvis-response")
         }
     }
 
     private fun requestRuntimePermissions() {
-        val permissions = mutableListOf(Manifest.permission.READ_CONTACTS, Manifest.permission.READ_CALL_LOG, Manifest.permission.CALL_PHONE, Manifest.permission.RECORD_AUDIO)
+        val permissions = mutableListOf(
+            Manifest.permission.READ_CONTACTS,
+            Manifest.permission.READ_CALL_LOG,
+            Manifest.permission.CALL_PHONE,
+            Manifest.permission.RECORD_AUDIO
+        )
         if (android.os.Build.VERSION.SDK_INT >= 33) permissions += Manifest.permission.POST_NOTIFICATIONS
         val missing = permissions.filter { ContextCompat.checkSelfPermission(this, it) != PackageManager.PERMISSION_GRANTED }
         if (missing.isNotEmpty()) ActivityCompat.requestPermissions(this, missing.toTypedArray(), 100)
@@ -109,8 +150,15 @@ class MainActivity : Activity() {
         return buildString {
             append("Последние сообщения:\n")
             messages.forEach { message ->
-                val appName = when (message.packageName) { JarvisNotificationService.WHATSAPP -> "WhatsApp"; JarvisNotificationService.TELEGRAM -> "Telegram"; else -> message.packageName }
-                append("• ").append(appName); if (message.title.isNotBlank()) append(" — ").append(message.title); if (message.text.isNotBlank()) append(": ").append(message.text); append('\n')
+                val appName = when (message.packageName) {
+                    JarvisNotificationService.WHATSAPP -> "WhatsApp"
+                    JarvisNotificationService.TELEGRAM -> "Telegram"
+                    else -> message.packageName
+                }
+                append("• ").append(appName)
+                if (message.title.isNotBlank()) append(" — ").append(message.title)
+                if (message.text.isNotBlank()) append(": ").append(message.text)
+                append('\n')
             }
         }.trim()
     }
@@ -128,39 +176,170 @@ class MainActivity : Activity() {
         }
     }
 
+    private fun checkForUpdates(manual: Boolean) {
+        backgroundExecutor.execute {
+            try {
+                val connection = (URL(GITHUB_LATEST_RELEASE).openConnection() as HttpURLConnection).apply {
+                    requestMethod = "GET"
+                    connectTimeout = 10000
+                    readTimeout = 15000
+                    setRequestProperty("Accept", "application/vnd.github+json")
+                    setRequestProperty("User-Agent", "JARVIS-Android")
+                }
+                val code = connection.responseCode
+                val body = connection.inputStream.bufferedReader(Charsets.UTF_8).use { it.readText() }
+                connection.disconnect()
+                if (code !in 200..299) throw IllegalStateException("HTTP $code")
+
+                val release = JSONObject(body)
+                val tag = release.optString("tag_name")
+                val latestCode = tag.substringAfterLast(".").toIntOrNull() ?: 0
+                val asset = release.optJSONArray("assets")?.let { assets ->
+                    (0 until assets.length()).map { assets.optJSONObject(it) }.firstOrNull {
+                        it?.optString("name") == APK_ASSET_NAME
+                    }
+                }
+                val downloadUrl = asset?.optString("browser_download_url").orEmpty()
+
+                if (latestCode > BuildConfig.VERSION_CODE && downloadUrl.isNotBlank()) {
+                    mainHandler.post { showUpdateDialog(release.optString("name", "Новая версия J.A.R.V.I.S."), downloadUrl) }
+                } else if (manual) {
+                    mainHandler.post {
+                        Toast.makeText(this, "У вас установлена последняя версия J.A.R.V.I.S.", Toast.LENGTH_SHORT).show()
+                    }
+                }
+            } catch (_: Exception) {
+                if (manual) mainHandler.post {
+                    Toast.makeText(this, "Не удалось проверить обновления.", Toast.LENGTH_SHORT).show()
+                }
+            }
+        }
+    }
+
+    private fun showUpdateDialog(title: String, downloadUrl: String) {
+        AlertDialog.Builder(this)
+            .setTitle("Доступно обновление")
+            .setMessage("$title\n\nТекущая версия: ${BuildConfig.VERSION_NAME}\nНовая версия доступна на GitHub.")
+            .setNegativeButton("Позже", null)
+            .setPositiveButton("Обновить") { _, _ -> downloadAndInstall(downloadUrl) }
+            .show()
+    }
+
+    private fun downloadAndInstall(downloadUrl: String) {
+        Toast.makeText(this, "Скачиваю обновление…", Toast.LENGTH_LONG).show()
+        backgroundExecutor.execute {
+            val file = File(cacheDir, APK_ASSET_NAME)
+            try {
+                val connection = (URL(downloadUrl).openConnection() as HttpURLConnection).apply {
+                    connectTimeout = 15000
+                    readTimeout = 120000
+                    instanceFollowRedirects = true
+                    setRequestProperty("User-Agent", "JARVIS-Android")
+                }
+                connection.inputStream.use { input -> file.outputStream().use { output -> input.copyTo(output) } }
+                connection.disconnect()
+
+                val uri = FileProvider.getUriForFile(this, "${BuildConfig.APPLICATION_ID}.fileprovider", file)
+                mainHandler.post {
+                    val intent = Intent(Intent.ACTION_VIEW).apply {
+                        setDataAndType(uri, "application/vnd.android.package-archive")
+                        addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                        addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                    }
+                    try {
+                        startActivity(intent)
+                    } catch (_: Exception) {
+                        Toast.makeText(this, "Не удалось открыть установщик APK.", Toast.LENGTH_LONG).show()
+                    }
+                }
+            } catch (e: Exception) {
+                mainHandler.post {
+                    Toast.makeText(this, "Ошибка загрузки обновления: ${e.message ?: "неизвестная ошибка"}", Toast.LENGTH_LONG).show()
+                }
+            }
+        }
+    }
+
     inner class AndroidBridge {
         @JavascriptInterface fun command(text: String): String {
             val normalized = text.trim().lowercase()
-            if (normalized.contains("кто мне написал") || normalized.contains("прочитай сообщения") || normalized.contains("прочитай сообщение") || normalized.contains("новые сообщения")) return notificationReply()
+            if (
+                normalized.contains("кто мне написал") ||
+                normalized.contains("прочитай сообщения") ||
+                normalized.contains("прочитай сообщение") ||
+                normalized.contains("новые сообщения")
+            ) return notificationReply()
             if (router.canHandle(text)) return router.execute(text)
             sendToGigaChat(text)
             return ""
         }
+
         @JavascriptInterface fun startListening() { runOnUiThread { this@MainActivity.startListening() } }
         @JavascriptInterface fun speak(text: String) { runOnUiThread { this@MainActivity.speak(text) } }
         @JavascriptInterface fun setPersona(name: String) { selectedPersona = name; prefs.edit().putString("persona", name).apply() }
-        @JavascriptInterface fun setApiKeys(fish: String, giga: String): String {
+
+        @JavascriptInterface
+        fun setApiKeys(fish: String, giga: String): String {
             val editor = prefs.edit()
             if (fish.isNotBlank()) editor.putString("fish_api_key", fish)
             if (giga.isNotBlank()) editor.putString("gigachat_api_key", giga)
             editor.apply()
             return "Fish Audio: ${if (fish.isNotBlank() || prefs.getString("fish_api_key", "").orEmpty().isNotBlank()) "✓ настроен" else "не настроен"} · GigaChat: ${if (giga.isNotBlank() || prefs.getString("gigachat_api_key", "").orEmpty().isNotBlank()) "✓ настроен" else "не настроен"}"
         }
-        @JavascriptInterface fun getApiKeyStatus(): String = JSONObject().apply {
+
+        @JavascriptInterface
+        fun getApiKeyStatus(): String = JSONObject().apply {
             put("fish", prefs.getString("fish_api_key", "").orEmpty().isNotBlank())
             put("giga", prefs.getString("gigachat_api_key", "").orEmpty().isNotBlank())
         }.toString()
-        @JavascriptInterface fun listApps(): String {
-            val array = JSONArray(); router.launcherApps().forEach { array.put(JSONObject().apply { put("label", it.label); put("packageName", it.packageName); put("allowed", router.isAppAllowed(it.packageName)) }) }; return array.toString()
+
+        @JavascriptInterface
+        fun listApps(): String {
+            val array = JSONArray()
+            router.launcherApps().forEach {
+                array.put(JSONObject().apply {
+                    put("label", it.label)
+                    put("packageName", it.packageName)
+                    put("allowed", router.isAppAllowed(it.packageName))
+                })
+            }
+            return array.toString()
         }
-        @JavascriptInterface fun setAppAllowed(packageName: String, allowed: Boolean): String { router.setAppAllowed(packageName, allowed); return if (allowed) "Приложение добавлено в JARVIS." else "Приложение удалено из JARVIS." }
-        @JavascriptInterface fun enableAccessibility(): String { openAccessibilitySettings(); return "Откройте J.A.R.V.I.S. в специальных возможностях Android и включите доступ." }
-        @JavascriptInterface fun enableNotifications(): String { openNotificationSettings(); return "Откройте доступ к уведомлениям для J.A.R.V.I.S. и вернитесь в приложение." }
-        @JavascriptInterface fun clearMessages(): String { JarvisNotificationService.clear(); return "История уведомлений J.A.R.V.I.S. очищена." }
+
+        @JavascriptInterface fun setAppAllowed(packageName: String, allowed: Boolean): String {
+            router.setAppAllowed(packageName, allowed)
+            return if (allowed) "Приложение добавлено в JARVIS." else "Приложение удалено из JARVIS."
+        }
+
+        @JavascriptInterface fun enableAccessibility(): String {
+            openAccessibilitySettings()
+            return "Откройте J.A.R.V.I.S. в специальных возможностях Android и включите доступ."
+        }
+
+        @JavascriptInterface fun enableNotifications(): String {
+            openNotificationSettings()
+            return "Откройте доступ к уведомлениям для J.A.R.V.I.S. и вернитесь в приложение."
+        }
+
+        @JavascriptInterface fun clearMessages(): String {
+            JarvisNotificationService.clear()
+            return "История уведомлений J.A.R.V.I.S. очищена."
+        }
+
+        @JavascriptInterface fun checkUpdates() { checkForUpdates(true) }
         @JavascriptInterface fun toast(text: String) { runOnUiThread { Toast.makeText(this@MainActivity, text, Toast.LENGTH_SHORT).show() } }
     }
 
     override fun onDestroy() {
-        backgroundExecutor.shutdownNow(); speechRecognizer?.destroy(); tts?.stop(); tts?.shutdown(); fishAudioTts.release(); webView.removeJavascriptInterface("AndroidJarvis"); webView.destroy(); super.onDestroy()
+        backgroundExecutor.shutdownNow()
+        speechRecognizer?.destroy()
+        tts?.stop()
+        tts?.shutdown()
+        fishAudioTts.release()
+        if (::webView.isInitialized) {
+            webView.removeJavascriptInterface("AndroidJarvis")
+            webView.destroy()
+        }
+        super.onDestroy()
     }
 }
