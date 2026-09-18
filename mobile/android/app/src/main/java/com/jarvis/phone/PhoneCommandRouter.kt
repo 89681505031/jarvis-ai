@@ -1,6 +1,7 @@
 package com.jarvis.phone
 
 import android.Manifest
+import android.app.Activity
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
@@ -27,6 +28,7 @@ class PhoneCommandRouter(private val context: Context) {
             lower.contains("уменьши громкость") || lower.contains("сделай тише") ||
             lower.contains("выключи звук") || lower.contains("включи звук") ||
             lower == "назад" || lower.contains("вернись назад") ||
+            lower == "вперед" || lower == "вперёд" || lower.contains("идти вперед") || lower.contains("идти вперёд") ||
             lower == "домой" || lower.contains("на главный экран") ||
             lower.contains("открой последние приложения") || lower.contains("покажи последние приложения")
     }
@@ -65,8 +67,9 @@ class PhoneCommandRouter(private val context: Context) {
             lower.contains("уменьши громкость") || lower.contains("сделай тише") -> changeVolume(false)
             lower.contains("выключи звук") -> setMute(true)
             lower.contains("включи звук") -> setMute(false)
-            lower == "назад" || lower.contains("вернись назад") -> accessibilityAction(android.accessibilityservice.AccessibilityService.GLOBAL_ACTION_BACK, "Возвращаюсь назад.")
-            lower == "домой" || lower.contains("на главный экран") -> accessibilityAction(android.accessibilityservice.AccessibilityService.GLOBAL_ACTION_HOME, "Переход на главный экран.")
+            lower == "назад" || lower.contains("вернись назад") -> goBack()
+            lower == "вперед" || lower == "вперёд" || lower.contains("идти вперед") || lower.contains("идти вперёд") -> goForward()
+            lower == "домой" || lower.contains("на главный экран") -> goHome()
             lower.contains("открой последние приложения") || lower.contains("покажи последние приложения") -> accessibilityAction(android.accessibilityservice.AccessibilityService.GLOBAL_ACTION_RECENTS, "Открываю последние приложения.")
             lower.startsWith("открой ") -> openAllowedApp(command.substringAfter("открой ").trim())
             else -> "Команда PHONE MODE пока не подключена: $command"
@@ -149,6 +152,44 @@ class PhoneCommandRouter(private val context: Context) {
         } catch (_: Exception) {
             "Не удалось изменить состояние звука."
         }
+    }
+
+    private fun goBack(): String {
+        val service = JarvisAccessibilityService.instance
+        if (service != null && service.performGlobalAction(android.accessibilityservice.AccessibilityService.GLOBAL_ACTION_BACK)) {
+            return "Возвращаюсь назад."
+        }
+        val activity = context as? Activity
+        if (activity != null) {
+            activity.runOnUiThread { activity.onBackPressed() }
+            return "Возвращаюсь назад."
+        }
+        return "Не удалось выполнить команду «назад». Включите J.A.R.V.I.S. в специальных возможностях Android."
+    }
+
+    private fun goHome(): String {
+        val service = JarvisAccessibilityService.instance
+        if (service != null && service.performGlobalAction(android.accessibilityservice.AccessibilityService.GLOBAL_ACTION_HOME)) {
+            return "Переход на главный экран."
+        }
+        return try {
+            val intent = Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_HOME)
+                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            context.startActivity(intent)
+            "Переход на главный экран."
+        } catch (_: Exception) {
+            "Не удалось перейти на главный экран."
+        }
+    }
+
+    private fun goForward(): String {
+        val service = JarvisAccessibilityService.instance
+        if (service != null) {
+            if (service.clickText("Вперёд") || service.clickText("Вперед") || service.clickText("Forward")) {
+                return "Вперёд."
+            }
+        }
+        return "Команда «вперёд» зависит от приложения. Включите J.A.R.V.I.S. в специальных возможностях Android, чтобы я мог нажать кнопку «Вперёд» в поддерживаемом приложении."
     }
 
     private fun accessibilityAction(action: Int, successMessage: String): String {
