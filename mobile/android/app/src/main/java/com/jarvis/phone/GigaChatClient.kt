@@ -21,6 +21,7 @@ class GigaChatClient(private val context: Context) {
         val key = context.getSharedPreferences("jarvis_settings", Context.MODE_PRIVATE)
             .getString("gigachat_api_key", "").orEmpty().trim()
         if (key.isBlank()) return "В настройках J.A.R.V.I.S. не указан API ключ GigaChat."
+
         return try {
             val token = getToken(key)
             val body = JSONObject().apply {
@@ -36,14 +37,20 @@ class GigaChatClient(private val context: Context) {
                     })
                 })
             }
-            val response = postJson(CHAT_URL, body.toString(), mapOf(
-                "Authorization" to "Bearer $token",
-                "Content-Type" to "application/json",
-                "Accept" to "application/json"
-            ))
-            val json = JSONObject(response)
-            json.optJSONArray("choices")?.optJSONObject(0)?.optJSONObject("message")?.optString("content")?.trim()
-                ?.takeIf { it.isNotBlank() }
+
+            val response = postJson(
+                CHAT_URL,
+                body.toString(),
+                mapOf(
+                    "Authorization" to "Bearer $token",
+                    "Content-Type" to "application/json",
+                    "Accept" to "application/json"
+                )
+            )
+
+            JSONObject(response).optJSONArray("choices")
+                ?.optJSONObject(0)?.optJSONObject("message")?.optString("content")
+                ?.trim()?.takeIf { it.isNotBlank() }
                 ?: "GigaChat не вернул текст ответа."
         } catch (e: Exception) {
             "Не удалось получить ответ GigaChat: ${e.message ?: "ошибка соединения"}"
@@ -54,18 +61,23 @@ class GigaChatClient(private val context: Context) {
     private fun getToken(key: String): String {
         val now = System.currentTimeMillis()
         accessToken?.let { if (now + 60_000L < tokenExpiresAt) return it }
-        val response = postForm(TOKEN_URL, "scope=GIGACHAT_API_PERS", mapOf(
-            "Authorization" to "Basic $key",
-            "RqUID" to UUID.randomUUID().toString(),
-            "Content-Type" to "application/x-www-form-urlencoded",
-            "Accept" to "application/json"
-        ))
+
+        val response = postForm(
+            TOKEN_URL,
+            "scope=GIGACHAT_API_PERS",
+            mapOf(
+                "Authorization" to "Basic $key",
+                "RqUID" to UUID.randomUUID().toString(),
+                "Content-Type" to "application/x-www-form-urlencoded",
+                "Accept" to "application/json"
+            )
+        )
+
         val json = JSONObject(response)
         val token = json.optString("access_token")
         if (token.isBlank()) throw IllegalStateException("GigaChat не выдал access token")
         accessToken = token
-        val expiresAtSeconds = json.optLong("expires_at", (now / 1000L) + 1500L)
-        tokenExpiresAt = expiresAtSeconds * 1000L
+        tokenExpiresAt = json.optLong("expires_at", (now / 1000L) + 1500L) * 1000L
         return token
     }
 
@@ -92,6 +104,7 @@ class GigaChatClient(private val context: Context) {
             doOutput = true
             headers.forEach { (name, value) -> setRequestProperty(name, value) }
         }
+
         return try {
             connection.outputStream.use { it.write(body) }
             val code = connection.responseCode
