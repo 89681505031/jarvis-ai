@@ -11,7 +11,8 @@ class GigaChatClient(private val context: Context) {
     companion object {
         private const val TOKEN_URL = "https://ngw.devices.sberbank.ru:9443/api/v2/oauth"
         private const val CHAT_URL = "https://api.giga.chat/v1/chat/completions"
-        private const val MODEL = "GigaChat"
+        // The legacy name may return 404 for some accounts. Use a currently supported model.
+        private const val MODEL = "GigaChat-2"
     }
 
     @Volatile private var accessToken: String? = null
@@ -37,42 +38,28 @@ class GigaChatClient(private val context: Context) {
                     })
                 })
             }
-
-            val response = postJson(
-                CHAT_URL,
-                body.toString(),
-                mapOf(
-                    "Authorization" to "Bearer $token",
-                    "Content-Type" to "application/json",
-                    "Accept" to "application/json"
-                )
-            )
-
-            JSONObject(response).optJSONArray("choices")
-                ?.optJSONObject(0)?.optJSONObject("message")?.optString("content")
-                ?.trim()?.takeIf { it.isNotBlank() }
-                ?: "GigaChat не вернул текст ответа."
+            val response = postJson(CHAT_URL, body.toString(), mapOf(
+                "Authorization" to "Bearer $token",
+                "Content-Type" to "application/json",
+                "Accept" to "application/json"
+            ))
+            JSONObject(response).optJSONArray("choices")?.optJSONObject(0)
+                ?.optJSONObject("message")?.optString("content")?.trim()
+                ?.takeIf { it.isNotBlank() } ?: "GigaChat не вернул текст ответа."
         } catch (e: Exception) {
             "Не удалось получить ответ GigaChat: ${e.message ?: "ошибка соединения"}"
         }
     }
 
-    @Synchronized
-    private fun getToken(key: String): String {
+    @Synchronized private fun getToken(key: String): String {
         val now = System.currentTimeMillis()
         accessToken?.let { if (now + 60_000L < tokenExpiresAt) return it }
-
-        val response = postForm(
-            TOKEN_URL,
-            "scope=GIGACHAT_API_PERS",
-            mapOf(
-                "Authorization" to "Basic $key",
-                "RqUID" to UUID.randomUUID().toString(),
-                "Content-Type" to "application/x-www-form-urlencoded",
-                "Accept" to "application/json"
-            )
-        )
-
+        val response = postForm(TOKEN_URL, "scope=GIGACHAT_API_PERS", mapOf(
+            "Authorization" to "Basic $key",
+            "RqUID" to UUID.randomUUID().toString(),
+            "Content-Type" to "application/x-www-form-urlencoded",
+            "Accept" to "application/json"
+        ))
         val json = JSONObject(response)
         val token = json.optString("access_token")
         if (token.isBlank()) throw IllegalStateException("GigaChat не выдал access token")
@@ -89,11 +76,8 @@ class GigaChatClient(private val context: Context) {
         else -> "Ты J.A.R.V.I.S., персональный голосовой ассистент пользователя. Отвечай по-русски, вежливо, кратко и естественно. Обращайся к пользователю как к сэр, когда это уместно."
     }
 
-    private fun postForm(url: String, body: String, headers: Map<String, String>): String =
-        request(url, "POST", body.toByteArray(Charsets.UTF_8), headers)
-
-    private fun postJson(url: String, body: String, headers: Map<String, String>): String =
-        request(url, "POST", body.toByteArray(Charsets.UTF_8), headers)
+    private fun postForm(url: String, body: String, headers: Map<String, String>) = request(url, "POST", body.toByteArray(Charsets.UTF_8), headers)
+    private fun postJson(url: String, body: String, headers: Map<String, String>) = request(url, "POST", body.toByteArray(Charsets.UTF_8), headers)
 
     private fun request(urlString: String, method: String, body: ByteArray, headers: Map<String, String>): String {
         val connection = (URL(urlString).openConnection() as HttpURLConnection).apply {
@@ -104,7 +88,6 @@ class GigaChatClient(private val context: Context) {
             doOutput = true
             headers.forEach { (name, value) -> setRequestProperty(name, value) }
         }
-
         return try {
             connection.outputStream.use { it.write(body) }
             val code = connection.responseCode
@@ -112,16 +95,10 @@ class GigaChatClient(private val context: Context) {
             val text = stream?.bufferedReader(Charsets.UTF_8)?.use { it.readText() }.orEmpty()
             if (code !in 200..299) throw IllegalStateException("HTTP $code: ${extractError(text)}")
             text
-        } finally {
-            connection.disconnect()
-        }
+        } finally { connection.disconnect() }
     }
 
-    private fun extractError(text: String): String {
-        return try {
-            JSONObject(text).optString("message").ifBlank { text.take(180) }
-        } catch (_: Exception) {
-            text.take(180)
-        }
-    }
+    private fun extractError(text: String): String = try {
+        JSONObject(text).optString("message").ifBlank { text.take(180) }
+    } catch (_: Exception) { text.take(180) }
 }
