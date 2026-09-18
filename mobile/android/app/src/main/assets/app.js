@@ -19,7 +19,7 @@ function sendCommand(textOverride){
   if(state.mode==='phone'&&window.AndroidJarvis){
     try{
       const result=window.AndroidJarvis.command(text);
-      if(result){showMessage(result);if(typeof window.AndroidJarvis.speak==='function')window.AndroidJarvis.speak(result)}
+      if(result)showMessage(result);
       else showMessage('Обрабатываю запрос…');
     }catch(e){showMessage('Ошибка выполнения команды: '+e.message)}
   }else if(state.mode==='phone')showMessage('PHONE MODE работает в APK JARVIS.');
@@ -42,7 +42,7 @@ function onSpeechResult(text){
   sendCommand(clean);
 }
 window.onJarvisSpeechResult=onSpeechResult;
-window.onGigaChatResult=function(text){showMessage(text);if(window.AndroidJarvis&&window.AndroidJarvis.speak)window.AndroidJarvis.speak(text)};
+window.onGigaChatResult=function(text){showMessage(text)};
 
 function loadApps(){
   if(!(window.AndroidJarvis&&typeof window.AndroidJarvis.listApps==='function')){appsList.innerHTML='<div class="app-empty">Список приложений доступен внутри APK JARVIS.</div>';return}
