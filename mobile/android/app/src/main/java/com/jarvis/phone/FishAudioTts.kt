@@ -2,6 +2,8 @@ package com.jarvis.phone
 
 import android.content.Context
 import android.media.MediaPlayer
+import android.os.Handler
+import android.os.Looper
 import org.json.JSONObject
 import java.io.File
 import java.net.HttpURLConnection
@@ -18,24 +20,24 @@ class FishAudioTts(private val context: Context) {
         private const val CYBER_VOICE_ID = "cc1b79b1108f4ed3b8aac118ba6ebd07"
         private const val TERRA_VOICE_ID = "c962ed46edfd419abc530d1e33a7435f"
 
-        fun voiceIdFor(persona: String): String? = when (persona) {
-            "J.A.R.V.I.S." -> JARVIS_VOICE_ID
-            "Astra" -> ASTRA_VOICE_ID
-            "Luna" -> LUNA_VOICE_ID
-            "Terra" -> TERRA_VOICE_ID
-            "Cyber" -> CYBER_VOICE_ID
+        fun voiceIdFor(persona: String): String? = when (persona.trim().lowercase()) {
+            "j.a.r.v.i.s.", "jarvis", "j.a.r.v.i.s" -> JARVIS_VOICE_ID
+            "astra" -> ASTRA_VOICE_ID
+            "luna" -> LUNA_VOICE_ID
+            "terra" -> TERRA_VOICE_ID
+            "cyber" -> CYBER_VOICE_ID
             else -> null
         }
     }
 
     private val executor = Executors.newSingleThreadExecutor()
+    private val mainHandler = Handler(Looper.getMainLooper())
     private var player: MediaPlayer? = null
 
     fun speak(text: String, persona: String, onError: ((String) -> Unit)? = null) {
         val prefs = context.getSharedPreferences("jarvis_settings", Context.MODE_PRIVATE)
-        val apiKey = prefs.getString("fish_api_key", "").orEmpty()
+        val apiKey = prefs.getString("fish_api_key", "").orEmpty().trim()
         val voiceId = voiceIdFor(persona)
-
         if (apiKey.isBlank()) { onError?.invoke("Fish Audio API key is not configured"); return }
         if (voiceId.isNullOrBlank()) { onError?.invoke("Voice ID for $persona is not configured"); return }
 
@@ -46,7 +48,6 @@ class FishAudioTts(private val context: Context) {
                     put("reference_id", voiceId)
                     put("format", "mp3")
                 }.toString()
-
                 val connection = (URL(API_URL).openConnection() as HttpURLConnection).apply {
                     requestMethod = "POST"
                     connectTimeout = 15000
@@ -56,27 +57,25 @@ class FishAudioTts(private val context: Context) {
                     setRequestProperty("Content-Type", "application/json")
                     setRequestProperty("model", MODEL)
                 }
-
                 connection.outputStream.use { it.write(body.toByteArray(Charsets.UTF_8)) }
-                if (connection.responseCode !in 200..299) {
-                    throw IllegalStateException("Fish Audio HTTP ${connection.responseCode}")
+                val code = connection.responseCode
+                if (code !in 200..299) {
+                    val error = connection.errorStream?.bufferedReader()?.use { it.readText() }.orEmpty()
+                    throw IllegalStateException("Fish Audio HTTP $code: ${error.take(160)}")
                 }
-
                 val file = File(context.cacheDir, "jarvis_fish_${System.currentTimeMillis()}.mp3")
-                connection.inputStream.use { input ->
-                    file.outputStream().use { output -> input.copyTo(output) }
-                }
+                connection.inputStream.use { input -> file.outputStream().use { output -> input.copyTo(output) } }
                 connection.disconnect()
 
-                android.os.Handler(android.os.Looper.getMainLooper()).post {
+                mainHandler.post {
                     try {
                         player?.release()
                         player = MediaPlayer().apply {
                             setDataSource(file.absolutePath)
                             setOnCompletionListener { release(); player = null; file.delete() }
                             setOnErrorListener { _, _, _ -> release(); player = null; file.delete(); true }
-                            prepare()
-                            start()
+                            setOnPreparedListener { start() }
+                            prepareAsync()
                         }
                     } catch (e: Exception) {
                         file.delete()
@@ -84,7 +83,7 @@ class FishAudioTts(private val context: Context) {
                     }
                 }
             } catch (e: Exception) {
-                onError?.invoke(e.message ?: "Fish Audio request error")
+                mainHandler.post { onError?.invoke(e.message ?: "Fish Audio request error") }
             }
         }
     }
