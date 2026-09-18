@@ -101,6 +101,8 @@ class MainActivity : Activity() {
     }
 
     private fun startListening() {
+        wakeListening = false
+        speechRecognizer?.cancel()
         if (ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {
             requestRuntimePermissions()
             return
@@ -144,6 +146,13 @@ class MainActivity : Activity() {
         if (android.os.Build.VERSION.SDK_INT >= 33) permissions += Manifest.permission.POST_NOTIFICATIONS
         val missing = permissions.filter { ContextCompat.checkSelfPermission(this, it) != PackageManager.PERMISSION_GRANTED }
         if (missing.isNotEmpty()) ActivityCompat.requestPermissions(this, missing.toTypedArray(), 100)
+    }
+
+    override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<out String>, grantResults: IntArray) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults)
+        if (requestCode == 100 && grantResults.any { it == PackageManager.PERMISSION_GRANTED }) {
+            mainHandler.postDelayed({ startWakeListening() }, 500)
+        }
     }
 
     fun openAccessibilitySettings() { startActivity(Intent(android.provider.Settings.ACTION_ACCESSIBILITY_SETTINGS)) }
