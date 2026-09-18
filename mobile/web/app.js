@@ -42,21 +42,20 @@ function sendCommand(textOverride){
   if(state.mode==='phone' && window.AndroidJarvis){
     try{
       const result=window.AndroidJarvis.command(text);
-      if(result){showMessage(result);if(typeof window.AndroidJarvis.speak==='function') window.AndroidJarvis.speak(result)}
-      else showMessage('Думаю…');
+      if(result){showMessage(result);if(typeof window.AndroidJarvis.speak==='function')window.AndroidJarvis.speak(result);if(typeof window.AndroidJarvis.startConversationWindow==='function')window.AndroidJarvis.startConversationWindow(12)}else showMessage('Думаю…');
     }catch(e){showMessage('Ошибка выполнения команды на телефоне.')}
   }else if(state.mode==='phone') showMessage('PHONE MODE работает в APK JARVIS.');
   else showMessage('PC MODE: подключение к компьютеру будет следующим этапом.');
   command.value='';
 }
 function startListening(){
-  if(!(window.AndroidJarvis&&typeof window.AndroidJarvis.startListening==='function')){showMessage('Голосовой ввод доступен в APK JARVIS.');return;}
-  state.waitingForCommand=false; showMessage('Слушаю…'); window.AndroidJarvis.startListening();
+  if(!(window.AndroidJarvis&&typeof window.AndroidJarvis.startListening==='function')){showMessage('Голосовой ввод доступен в APK JARVIS.');return}
+  state.waitingForCommand=true;showMessage('Слушаю…');window.AndroidJarvis.startListening();
 }
 function listenForCommand(){
-  state.waitingForCommand=true; showMessage('Слушаю…');
-  if(window.AndroidJarvis&&typeof window.AndroidJarvis.speak==='function') window.AndroidJarvis.speak('Слушаю');
-  setTimeout(()=>{if(window.AndroidJarvis&&typeof window.AndroidJarvis.startListening==='function')window.AndroidJarvis.startListening()},900);
+  state.waitingForCommand=true;showMessage('Слушаю…');
+  if(window.AndroidJarvis&&typeof window.AndroidJarvis.speak==='function')window.AndroidJarvis.speak('Слушаю');
+  if(window.AndroidJarvis&&typeof window.AndroidJarvis.startConversationWindow==='function')window.AndroidJarvis.startConversationWindow(10);
 }
 function onSpeechResult(text){
   if(!text)return;
@@ -82,6 +81,7 @@ function onSpeechResult(text){
 function onGigaChatResult(text){showMessage(text||'GigaChat не вернул ответ.');}
 window.onJarvisSpeechResult=onSpeechResult;
 window.onGigaChatResult=onGigaChatResult;
+function filterApps(){const q=(document.getElementById('appsSearch')?.value||'').trim().toLowerCase();document.querySelectorAll('#appsList .app-row').forEach(row=>{const n=(row.querySelector('span')?.textContent||'').toLowerCase();row.hidden=!!q&&!n.includes(q)})}
 function loadApps(){
   if(!(window.AndroidJarvis&&typeof window.AndroidJarvis.listApps==='function')){appsList.innerHTML='<div class="app-empty">Список приложений доступен внутри APK JARVIS.</div>';return}
   try{const apps=JSON.parse(window.AndroidJarvis.listApps());appsList.innerHTML='';apps.forEach(app=>{const row=document.createElement('label');row.className='app-row';row.innerHTML='<span>'+app.label+'</span><input type="checkbox" '+(app.allowed?'checked':'')+'>';row.querySelector('input').addEventListener('change',e=>{showMessage(window.AndroidJarvis.setAppAllowed(app.packageName,e.target.checked))});appsList.appendChild(row)});if(!apps.length)appsList.innerHTML='<div class="app-empty">Приложения не найдены.</div>'}catch(e){appsList.innerHTML='<div class="app-empty">Не удалось загрузить приложения.</div>'}
@@ -100,4 +100,4 @@ function saveKeys(){
     const result=window.AndroidJarvis.setApiKeys(fish,giga); apiStatus.textContent=result; fishApiKey.value=''; gigaApiKey.value='';
   }else apiStatus.textContent='Сохранение доступно в APK JARVIS.';
 }
-modeButton.addEventListener('click',toggleMode);modeNav.addEventListener('click',toggleMode);appsNav.addEventListener('click',toggleApps);refreshApps.addEventListener('click',loadApps);settingsNav.addEventListener('click',toggleSettings);saveApiKeys.addEventListener('click',saveKeys);send.addEventListener('click',()=>sendCommand());command.addEventListener('keydown',e=>{if(e.key==='Enter')sendCommand()});orbButton.addEventListener('click',startListening);orbButton.addEventListener('keydown',e=>{if(e.key==='Enter'||e.key===' ')startListening()});render();
+modeButton.addEventListener('click',toggleMode);modeNav.addEventListener('click',toggleMode);appsNav.addEventListener('click',toggleApps);refreshApps.addEventListener('click',loadApps);document.getElementById('appsSearch')?.addEventListener('input',filterApps);settingsNav.addEventListener('click',toggleSettings);saveApiKeys.addEventListener('click',saveKeys);send.addEventListener('click',()=>sendCommand());command.addEventListener('keydown',e=>{if(e.key==='Enter')sendCommand()});orbButton.addEventListener('click',startListening);orbButton.addEventListener('keydown',e=>{if(e.key==='Enter'||e.key===' ')startListening()});render();
