@@ -52,7 +52,7 @@ class JarvisNotificationService : NotificationListenerService() {
         val text = extras.getCharSequence(Notification.EXTRA_TEXT)?.toString()?.trim().orEmpty()
         if (title.isBlank() && text.isBlank()) return
 
-        val notificationKey = "$packageName:\${sbn.id}:\${sbn.tag.orEmpty()}"
+        val notificationKey = "$packageName:${sbn.id}:${sbn.tag.orEmpty()}"
         messages.removeIf { it.notificationKey == notificationKey }
         messages.add(IncomingMessage(packageName, title, text, System.currentTimeMillis(), notificationKey))
         while (messages.size > MAX_MESSAGES) messages.removeAt(0)
