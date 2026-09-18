@@ -20,11 +20,12 @@ class JarvisNotificationService : NotificationListenerService() {
         fun latest(limit: Int = 20): List<IncomingMessage> =
             messages.takeLast(limit.coerceAtLeast(0)).reversed()
 
-        fun clear() {
+        fun clear(context: Context) {
             messages.clear()
-            // The service instance owns persistence; clear it when available.
-            instance?.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
-                ?.edit()?.remove(KEY_MESSAGES)?.apply()
+            context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+                .edit()
+                .remove(KEY_MESSAGES)
+                .apply()
         }
 
         @Volatile
@@ -51,9 +52,7 @@ class JarvisNotificationService : NotificationListenerService() {
         val text = extras.getCharSequence(Notification.EXTRA_TEXT)?.toString()?.trim().orEmpty()
         if (title.isBlank() && text.isBlank()) return
 
-        // Messaging apps often repost/update the same notification. Replace the
-        // previous entry instead of making "new messages" repeat the same item.
-        val notificationKey = "$packageName:${sbn.id}:${sbn.tag.orEmpty()}"
+        val notificationKey = "$packageName:\${sbn.id}:\${sbn.tag.orEmpty()}"
         messages.removeIf { it.notificationKey == notificationKey }
         messages.add(IncomingMessage(packageName, title, text, System.currentTimeMillis(), notificationKey))
         while (messages.size > MAX_MESSAGES) messages.removeAt(0)
