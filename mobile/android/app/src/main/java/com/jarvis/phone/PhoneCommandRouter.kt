@@ -6,6 +6,8 @@ import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.net.Uri
+import android.os.Handler
+import android.os.Looper
 import android.provider.ContactsContract
 import android.provider.Settings
 import androidx.core.content.ContextCompat
@@ -31,7 +33,13 @@ class PhoneCommandRouter(private val context: Context) {
             lower == "назад" || lower.contains("вернись назад") || lower.contains("вернуться назад") || lower.contains("перейди назад") ||
             lower == "вперед" || lower == "вперёд" || lower.contains("идти вперед") || lower.contains("идти вперёд") || lower.contains("перейди вперед") || lower.contains("перейди вперёд") ||
             lower == "домой" || lower == "главный экран" || lower.contains("на главный экран") || lower.contains("перейди домой") ||
-            lower.contains("открой последние приложения") || lower.contains("покажи последние приложения")
+            lower.contains("открой последние приложения") || lower.contains("покажи последние приложения") ||
+            lower == "включи музыку" || lower == "включи музыку яндекс" || lower == "открой яндекс музыку" ||
+            lower.startsWith("включи песню ") || lower.startsWith("включи музыку ") ||
+            lower == "стоп" || lower == "стоп музыка" || lower == "останови музыку" || lower == "пауза" ||
+            lower == "следующая песня" || lower == "следующий трек" || lower == "дальше" ||
+            lower == "предыдущая песня" || lower == "предыдущий трек" || lower == "назад песню" ||
+            lower.contains("прочитай последнее сообщение в ватсап") || lower.contains("прочитай последнее сообщение whatsapp")
     }
 
     fun execute(raw: String): String {
@@ -72,8 +80,73 @@ class PhoneCommandRouter(private val context: Context) {
             lower == "вперед" || lower == "вперёд" || lower.contains("идти вперед") || lower.contains("идти вперёд") || lower.contains("перейди вперед") || lower.contains("перейди вперёд") -> goForward()
             lower == "домой" || lower == "главный экран" || lower.contains("на главный экран") || lower.contains("перейди домой") -> goHome()
             lower.contains("открой последние приложения") || lower.contains("покажи последние приложения") -> accessibilityAction(android.accessibilityservice.AccessibilityService.GLOBAL_ACTION_RECENTS, "Открываю последние приложения.")
+            lower == "включи музыку" || lower == "включи музыку яндекс" || lower == "открой яндекс музыку" -> openYandexMusic("")
+            lower.startsWith("включи песню ") -> playYandexSong(command.substringAfter("включи песню ").trim())
+            lower.startsWith("включи музыку ") -> playYandexSong(command.substringAfter("включи музыку ").trim())
+            lower == "стоп" || lower == "стоп музыка" || lower == "останови музыку" || lower == "пауза" -> musicControl("stop")
+            lower == "следующая песня" || lower == "следующий трек" || lower == "дальше" -> musicControl("next")
+            lower == "предыдущая песня" || lower == "предыдущий трек" || lower == "назад песню" -> musicControl("previous")
+            lower.contains("прочитай последнее сообщение в ватсап") || lower.contains("прочитай последнее сообщение whatsapp") -> openWhatsAppForReading()
             lower.startsWith("открой ") -> openAllowedApp(command.substringAfter("открой ").trim())
             else -> "Команда PHONE MODE пока не подключена: $command"
+        }
+    }
+
+    private fun openYandexMusic(query: String): String {
+        val packageName = "ru.yandex.music"
+        return try {
+            if (query.isBlank()) {
+                if (!openPackage(packageName)) return "Яндекс Музыка не установлена."
+                "Открываю Яндекс Музыку."
+            } else {
+                val intent = Intent(Intent.ACTION_VIEW, Uri.parse("yandexmusic://search?text=" + Uri.encode(query)))
+                    .setPackage(packageName)
+                    .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                context.startActivity(intent)
+                Handler(Looper.getMainLooper()).postDelayed({
+                    JarvisAccessibilityService.instance?.clickAnyText("Слушать", "Воспроизвести", "Play", "▶")
+                }, 1400)
+                "Ищу «$query» и включаю первый найденный трек."
+            }
+        } catch (_: Exception) {
+            "Не удалось открыть Яндекс Музыку. Установите приложение Яндекс Музыка."
+        }
+    }
+
+    private fun playYandexSong(query: String): String {
+        if (query.isBlank()) return "Назовите песню."
+        return openYandexMusic(query)
+    }
+
+    private fun musicControl(action: String): String {
+        val service = JarvisAccessibilityService.instance
+            ?: return "Для управления Яндекс Музыкой включите J.A.R.V.I.S. в специальных возможностях Android."
+        val clicked = when (action) {
+            "stop" -> service.clickAnyText("Пауза", "Pause", "Стоп", "Stop")
+            "next" -> service.clickAnyText("Следующий трек", "Следующая песня", "Дальше", "Next")
+            else -> service.clickAnyText("Предыдущий трек", "Предыдущая песня", "Назад", "Previous")
+        }
+        return if (clicked) {
+            when (action) {
+                "stop" -> "Музыка остановлена."
+                "next" -> "Переключаю на следующий трек."
+                else -> "Переключаю на предыдущий трек."
+            }
+        } else {
+            "Не удалось управлять воспроизведением. Откройте Яндекс Музыку и убедитесь, что J.A.R.V.I.S. имеет доступ в специальных возможностях."
+        }
+    }
+
+    fun openWhatsAppForReading(): String {
+        val packageName = launcherApps()
+            .filter { normalizeAppName(it.label).contains("whatsapp") }
+            .sortedBy { it.packageName }
+            .firstOrNull()?.packageName
+            ?: return "WhatsApp не установлен."
+        return if (openPackage(packageName)) {
+            "Открываю WhatsApp и читаю последнее сообщение."
+        } else {
+            "Не удалось открыть WhatsApp."
         }
     }
 
