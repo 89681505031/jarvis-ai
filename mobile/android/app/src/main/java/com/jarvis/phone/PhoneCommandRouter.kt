@@ -20,7 +20,11 @@ class PhoneCommandRouter(private val context: Context) {
             lower.contains("открой настройки") || lower.contains("открой камеру") ||
             lower.startsWith("найди в интернете") || lower.startsWith("позвони ") ||
             lower.contains("кто звонил") || lower.contains("пропущенные вызовы") ||
-            lower.startsWith("открой ")
+            lower.startsWith("открой ") ||
+            lower.contains("включи фонарик") || lower.contains("выключи фонарик") ||
+            lower.contains("включи свет") || lower.contains("выключи свет") ||
+            lower.contains("увеличь громкость") || lower.contains("сделай громче") ||
+            lower.contains("уменьши громкость") || lower.contains("сделай тише")
     }
 
     fun execute(raw: String): String {
@@ -39,6 +43,10 @@ class PhoneCommandRouter(private val context: Context) {
             lower.startsWith("найди в интернете") -> searchWeb(command.substringAfter("найди в интернете", "").trim())
             lower.startsWith("позвони ") -> callContact(command.substringAfter("позвони ").trim())
             lower.contains("кто звонил") || lower.contains("пропущенные вызовы") -> missedCalls()
+            lower.contains("включи фонарик") || lower.contains("включи свет") -> setFlashlight(true)
+            lower.contains("выключи фонарик") || lower.contains("выключи свет") -> setFlashlight(false)
+            lower.contains("увеличь громкость") || lower.contains("сделай громче") -> changeVolume(true)
+            lower.contains("уменьши громкость") || lower.contains("сделай тише") -> changeVolume(false)
             lower.startsWith("открой ") -> openAllowedApp(command.substringAfter("открой ").trim())
             else -> "Команда PHONE MODE пока не подключена: $command"
         }
@@ -78,6 +86,36 @@ class PhoneCommandRouter(private val context: Context) {
             return "Последний пропущенный вызов: ${cursor.getString(0) ?: "неизвестный номер"}."
         }
         return "Не удалось прочитать журнал вызовов."
+    }
+
+    private fun setFlashlight(enabled: Boolean): String {
+        val cameraManager = context.getSystemService(Context.CAMERA_SERVICE) as? android.hardware.camera2.CameraManager
+            ?: return "Фонарик недоступен на этом телефоне."
+        val cameraId = try {
+            cameraManager.cameraIdList.firstOrNull { id ->
+                cameraManager.getCameraCharacteristics(id)
+                    .get(android.hardware.camera2.CameraCharacteristics.FLASH_INFO_AVAILABLE) == true
+            }
+        } catch (_: Exception) {
+            null
+        } ?: return "Фонарик недоступен на этом телефоне."
+        return try {
+            cameraManager.setTorchMode(cameraId, enabled)
+            if (enabled) "Фонарик включён." else "Фонарик выключен."
+        } catch (_: Exception) {
+            "Не удалось изменить состояние фонарика."
+        }
+    }
+
+    private fun changeVolume(increase: Boolean): String {
+        val audio = context.getSystemService(Context.AUDIO_SERVICE) as? android.media.AudioManager
+            ?: return "Не удалось получить управление громкостью."
+        val direction = if (increase) android.media.AudioManager.ADJUST_RAISE else android.media.AudioManager.ADJUST_LOWER
+        audio.adjustStreamVolume(android.media.AudioManager.STREAM_MUSIC, direction, android.media.AudioManager.FLAG_SHOW_UI)
+        val current = audio.getStreamVolume(android.media.AudioManager.STREAM_MUSIC)
+        val max = audio.getStreamMaxVolume(android.media.AudioManager.STREAM_MUSIC)
+        val percent = if (max > 0) current * 100 / max else 0
+        return "Громкость: $percent%."
     }
 
     private fun normalizeAppName(value: String): String =
