@@ -5,7 +5,6 @@
         <domain includeSubdomains="true">api.giga.chat</domain>
         <trust-anchors>
             <certificates src="system" />
-            <certificates src="@raw/russian_trusted_root_ca" />
         </trust-anchors>
     </domain-config>
 </network-security-config>
