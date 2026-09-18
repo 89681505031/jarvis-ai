@@ -13,6 +13,7 @@ import android.speech.RecognizerIntent
 import android.speech.SpeechRecognizer
 import android.speech.tts.TextToSpeech
 import android.speech.tts.UtteranceProgressListener
+import android.text.Html
 import android.webkit.JavascriptInterface
 import android.webkit.WebView
 import android.webkit.WebViewClient
@@ -382,6 +383,108 @@ class MainActivity : Activity() {
         }.trim()
     }
 
+
+    private fun fetchNewsAndSpeak() {
+        showVoiceStatus("Получаю свежие новости…")
+        backgroundExecutor.execute {
+            try {
+                val url = URL("https://news.google.com/rss?hl=ru&gl=RU&ceid=RU:ru")
+                val connection = (url.openConnection() as HttpURLConnection).apply {
+                    requestMethod = "GET"
+                    connectTimeout = 10_000
+                    readTimeout = 20_000
+                    setRequestProperty("User-Agent", "JARVIS-Android")
+                }
+                val code = connection.responseCode
+                val xml = connection.inputStream.bufferedReader(Charsets.UTF_8).use { it.readText() }
+                connection.disconnect()
+                if (code !in 200..299) throw IllegalStateException("HTTP $code")
+
+                val items = Regex("<item>([\\s\\S]*?)</item>", RegexOption.IGNORE_CASE)
+                    .findAll(xml)
+                    .mapNotNull { match ->
+                        val block = match.groupValues[1]
+                        val title = Regex("<title>([\\s\\S]*?)</title>", RegexOption.IGNORE_CASE)
+                            .find(block)?.groupValues?.get(1)?.let { Html.fromHtml(it, Html.FROM_HTML_MODE_LEGACY).toString().trim() }
+                        val source = Regex("<source[^>]*>([\\s\\S]*?)</source>", RegexOption.IGNORE_CASE)
+                            .find(block)?.groupValues?.get(1)?.let { Html.fromHtml(it, Html.FROM_HTML_MODE_LEGACY).toString().trim() }
+                        title?.takeIf { it.isNotBlank() }?.let { if (source.isNullOrBlank()) it else "$it — $source" }
+                    }
+                    .take(6)
+                    .toList()
+
+                if (items.isEmpty()) throw IllegalStateException("В новостной ленте нет материалов.")
+                val prompt = "Сделай краткую нейтральную голосовую сводку свежих новостей на русском языке. Назови 5-6 главных тем по заголовкам ниже, по 1-2 предложения на тему. Не придумывай факты и явно отделяй заголовок от неподтвержденных деталей. Заголовки: " + items.joinToString(" | ")
+                val answer = gigaChat.ask(prompt, selectedPersona, "")
+                val finalText = if (answer.startsWith("В настройках J.A.R.V.I.S.")) {
+                    "Свежие новости: " + items.take(5).joinToString(". ")
+                } else answer
+                runOnUiThread {
+                    if (::webView.isInitialized) {
+                        webView.evaluateJavascript("window.onGigaChatResult && window.onGigaChatResult(${JSONObject.quote(finalText)})", null)
+                    }
+                    speak(finalText, resumeAfterSpeech = true)
+                }
+            } catch (e: Exception) {
+                val message = "Не удалось получить свежие новости: ${e.message ?: "ошибка соединения"}"
+                runOnUiThread {
+                    if (::webView.isInitialized) {
+                        webView.evaluateJavascript("window.onGigaChatResult && window.onGigaChatResult(${JSONObject.quote(message)})", null)
+                    }
+                    speak(message, resumeAfterSpeech = true)
+                }
+            }
+        }
+    }
+
+    private fun analyzeLatestWhatsApp() {
+        mainHandler.postDelayed({
+            backgroundExecutor.execute {
+                val notification = JarvisNotificationService.latest(30)
+                    .firstOrNull { it.packageName == JarvisNotificationService.WHATSAPP }
+                val screen = JarvisAccessibilityService.instance?.visibleText().orEmpty()
+                val source = buildString {
+                    if (notification != null) {
+                        append("Последнее уведомление WhatsApp. Отправитель/чат: ")
+                        append(notification.title)
+                        append(". Текст: ")
+                        append(notification.text)
+                    }
+                    if (screen.isNotBlank()) {
+                        if (isNotEmpty()) append("\n\n")
+                        append("Текст, видимый на открытом экране WhatsApp:\n")
+                        append(screen.take(8000))
+                    }
+                }.trim()
+
+                val answer = if (source.isBlank()) {
+                    "Я открыл WhatsApp, но не смог получить текст последнего сообщения. Проверьте доступ J.A.R.V.I.S. к уведомлениям и специальным возможностям."
+                } else {
+                    val prompt = "Проанализируй последнее сообщение WhatsApp по данным ниже. Ответь по-русски коротко и естественно для голосового ассистента. Обязательно назови имя отправителя или название группы, если оно видно. Затем объясни простыми словами, о чём сообщение, что человек или группа сообщает, просит или хочет. Не выдумывай отсутствующие сведения и скажи, если данных недостаточно. Данные WhatsApp:\n" + source
+                    val result = gigaChat.ask(prompt, selectedPersona, "")
+                    if (result.startsWith("В настройках J.A.R.V.I.S.")) {
+                        "Последнее сообщение: ${notification?.title.orEmpty()}. ${notification?.text.orEmpty()}".trim()
+                    } else result
+                }
+
+                runOnUiThread {
+                    if (::webView.isInitialized) {
+                        webView.evaluateJavascript("window.onGigaChatResult && window.onGigaChatResult(${JSONObject.quote(answer)})", null)
+                    }
+                    speak(answer, resumeAfterSpeech = true)
+                }
+            }
+        }, 1500)
+    }
+
+    private fun showVoiceStatus(text: String) {
+        runOnUiThread {
+            if (::webView.isInitialized) {
+                webView.evaluateJavascript("window.onGigaChatResult && window.onGigaChatResult(${JSONObject.quote(text)})", null)
+            }
+        }
+    }
+
     private fun sendToGigaChat(text: String, memoryText: String = text) {
         backgroundExecutor.execute {
             val answer = gigaChat.ask(text, selectedPersona, memory.memoryContext())
@@ -659,6 +762,29 @@ class MainActivity : Activity() {
                 }
                 memory.rememberTurn(memoryText, answer)
                 return answer
+            }
+
+            if (
+                normalized == "новости" ||
+                normalized.contains("сводка новостей") ||
+                normalized.contains("последние новости") ||
+                normalized.contains("главные новости")
+            ) {
+                fetchNewsAndSpeak()
+                memory.rememberTurn(memoryText, "Получаю свежую сводку новостей.")
+                return "Получаю свежую сводку новостей."
+            }
+
+            if (
+                normalized.contains("прочитай последнее сообщение в ватсап") ||
+                normalized.contains("прочитай последнее сообщение whatsapp")
+            ) {
+                val result = router.execute(text)
+                if (result.startsWith("Открываю WhatsApp")) {
+                    analyzeLatestWhatsApp()
+                }
+                memory.rememberTurn(memoryText, result)
+                return result
             }
 
             if (router.canHandle(text)) {
