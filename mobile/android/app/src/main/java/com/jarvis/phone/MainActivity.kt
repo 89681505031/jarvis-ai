@@ -220,13 +220,20 @@ class MainActivity : Activity() {
                 selectedPersona,
                 onError = { _ ->
                     runOnUiThread {
-                        tts?.speak(
-                            text,
-                            TextToSpeech.QUEUE_FLUSH,
-                            null,
-                            "jarvis-response-fallback-${System.currentTimeMillis()}"
-                        )
-                        Toast.makeText(this, "Fish Audio недоступен — использую системный голос.", Toast.LENGTH_SHORT).show()
+                        val fallbackId = "jarvis-response-fallback-${System.currentTimeMillis()}"
+                        val fallbackTts = tts
+                        if (fallbackTts != null) {
+                            fallbackTts.speak(
+                                text,
+                                TextToSpeech.QUEUE_FLUSH,
+                                null,
+                                fallbackId
+                            )
+                            Toast.makeText(this, "Fish Audio недоступен — использую системный голос.", Toast.LENGTH_SHORT).show()
+                        } else {
+                            // If the system TTS is not initialized, do not leave JARVIS stuck in speaking mode.
+                            finishSpeech()
+                        }
                     }
                 },
                 onComplete = { finishSpeech() }
