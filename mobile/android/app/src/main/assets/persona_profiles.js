@@ -16,4 +16,14 @@
     const value=String(text||'');
     return original(deviceCommands.test(value)?value:('[Персонаж: '+persona+'] '+instruction+'\nЗапрос пользователя: '+value));
   };
+  // После каждого ответа оставляем окно диалога открытым на 30 секунд.
+  // Небольшая пауза снижает вероятность, что распознавание поймает голос JARVIS.
+  if(typeof native.startConversationWindow==='function'){
+    const originalWindow=native.startConversationWindow.bind(native);
+    native.startConversationWindow=function(){
+      setTimeout(function(){
+        try{originalWindow(30)}catch(_){ }
+      },2500);
+    };
+  }
 })();
