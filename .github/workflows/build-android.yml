@@ -43,13 +43,6 @@ jobs:
           echo "/tmp/gradle-8.9/bin" >> "$GITHUB_PATH"
           gradle --version
 
-      - name: Add Russian Trusted Root CA for GigaChat
-        shell: bash
-        run: |
-          set -e
-          mkdir -p app/src/main/res/raw
-          curl -fsSL "https://gu-st.ru/content/lending/russian_trusted_root_ca_pem.crt" -o app/src/main/res/raw/russian_trusted_root_ca.crt
-          grep -q "BEGIN CERTIFICATE" app/src/main/res/raw/russian_trusted_root_ca.crt
 
       - name: Build debug APK
         run: gradle assembleDebug --no-daemon --no-build-cache
