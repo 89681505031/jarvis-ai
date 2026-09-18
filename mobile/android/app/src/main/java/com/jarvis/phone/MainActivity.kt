@@ -87,7 +87,11 @@ class MainActivity : Activity() {
     }
 
     private fun setupSpeechRecognizer() {
-        if (!SpeechRecognizer.isRecognitionAvailable(this)) return
+        if (!SpeechRecognizer.isRecognitionAvailable(this)) {
+            speechRecognizer = null
+            return
+        }
+        speechRecognizer?.destroy()
         speechRecognizer = SpeechRecognizer.createSpeechRecognizer(this)
         speechRecognizer?.setRecognitionListener(object : RecognitionListener {
             override fun onReadyForSpeech(params: Bundle?) = Unit
@@ -99,18 +103,52 @@ class MainActivity : Activity() {
             override fun onEvent(eventType: Int, params: Bundle?) = Unit
             override fun onError(error: Int) {
                 if (isSpeaking) return
+
                 val wasManual = manualListening
+                val wasConversation = conversationUntil > System.currentTimeMillis()
                 manualListening = false
-                if (conversationUntil > System.currentTimeMillis()) {
-                    restartConversationListening()
-                    return
-                }
-                restartWakeListening()
-                if (wasManual) {
-                    runOnUiThread {
-                        if (::webView.isInitialized) webView.evaluateJavascript("window.onJarvisSpeechResult && window.onJarvisSpeechResult('')", null)
+                wakeListening = false
+
+                if (error == SpeechRecognizer.ERROR_AUDIO ||
+                    error == SpeechRecognizer.ERROR_CLIENT ||
+                    error == SpeechRecognizer.ERROR_RECOGNIZER_BUSY
+                ) {
+                    mainHandler.post {
+                        if (!isFinishing && !isDestroyed) setupSpeechRecognizer()
                     }
                 }
+
+                if (wasManual || wasConversation) {
+                    conversationUntil = 0L
+                    runOnUiThread {
+                        if (::webView.isInitialized) {
+                            val message = when (error) {
+                                SpeechRecognizer.ERROR_INSUFFICIENT_PERMISSIONS ->
+                                    "Нет доступа к микрофону. Разрешите J.A.R.V.I.S. доступ к микрофону."
+                                SpeechRecognizer.ERROR_AUDIO ->
+                                    "Не удалось открыть микрофон. Проверьте, не использует ли микрофон другое приложение."
+                                SpeechRecognizer.ERROR_RECOGNIZER_BUSY ->
+                                    "Микрофон занят другим распознавателем. Повторите попытку."
+                                SpeechRecognizer.ERROR_NETWORK,
+                                SpeechRecognizer.ERROR_NETWORK_TIMEOUT ->
+                                    "Не удалось связаться с сервисом распознавания речи."
+                                SpeechRecognizer.ERROR_NO_MATCH,
+                                SpeechRecognizer.ERROR_SPEECH_TIMEOUT ->
+                                    "Я вас не услышал."
+                                else ->
+                                    "Не удалось распознать речь. Попробуйте ещё раз."
+                            }
+                            webView.evaluateJavascript(
+                                "window.onJarvisSpeechError && window.onJarvisSpeechError(${JSONObject.quote(message)})",
+                                null
+                            )
+                        }
+                    }
+                    restartWakeListening()
+                    return
+                }
+
+                restartWakeListening()
             }
             override fun onResults(results: Bundle?) {
                 if (isSpeaking) return
@@ -140,10 +178,26 @@ class MainActivity : Activity() {
         }
         if (ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {
             requestRuntimePermissions()
+            runOnUiThread {
+                if (::webView.isInitialized) {
+                    webView.evaluateJavascript(
+                        "window.onJarvisSpeechError && window.onJarvisSpeechError(${JSONObject.quote("Разрешите J.A.R.V.I.S. доступ к микрофону.")})",
+                        null
+                    )
+                }
+            }
             return
         }
         if (speechRecognizer == null) {
-            Toast.makeText(this, "Голосовой ввод недоступен на этом устройстве.", Toast.LENGTH_SHORT).show()
+            Toast.makeText(this, "На устройстве не найден сервис распознавания речи.", Toast.LENGTH_SHORT).show()
+            runOnUiThread {
+                if (::webView.isInitialized) {
+                    webView.evaluateJavascript(
+                        "window.onJarvisSpeechError && window.onJarvisSpeechError(${JSONObject.quote("На устройстве не найден сервис распознавания речи.")})",
+                        null
+                    )
+                }
+            }
             return
         }
         conversationUntil = System.currentTimeMillis() + durationMs
@@ -278,8 +332,30 @@ class MainActivity : Activity() {
 
     override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<out String>, grantResults: IntArray) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults)
-        if (requestCode == 100 && grantResults.any { it == PackageManager.PERMISSION_GRANTED }) {
-            mainHandler.postDelayed({ startWakeListening() }, 500)
+        if (requestCode != 100) return
+
+        val microphoneGranted =
+            ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED
+
+        if (microphoneGranted) {
+            runOnUiThread {
+                if (::webView.isInitialized) {
+                    webView.evaluateJavascript(
+                        "window.onJarvisSpeechReady && window.onJarvisSpeechReady()",
+                        null
+                    )
+                }
+            }
+            mainHandler.postDelayed({ startWakeListening() }, 350)
+        } else {
+            runOnUiThread {
+                if (::webView.isInitialized) {
+                    webView.evaluateJavascript(
+                        "window.onJarvisSpeechError && window.onJarvisSpeechError(${JSONObject.quote("Доступ к микрофону не разрешён. Включите его в разрешениях Android для J.A.R.V.I.S.")})",
+                        null
+                    )
+                }
+            }
         }
     }
 
@@ -361,9 +437,18 @@ class MainActivity : Activity() {
     override fun onPause() {
         activityResumed = false
         wakeListening = false
+        manualListening = false
         conversationUntil = 0L
         mainHandler.removeCallbacksAndMessages(null)
         speechRecognizer?.cancel()
+        runOnUiThread {
+            if (::webView.isInitialized) {
+                webView.evaluateJavascript(
+                    "window.onJarvisSpeechReady && window.onJarvisSpeechReady()",
+                    null
+                )
+            }
+        }
         super.onPause()
     }
 
