@@ -725,6 +725,9 @@ class MainActivity : Activity() {
     }
 
     private fun downloadAndInstallAuto(downloadUrl: String) {
+        mainHandler.post {
+            Toast.makeText(this@MainActivity, "Скачиваю обновление…", Toast.LENGTH_LONG).show()
+        }
         backgroundExecutor.execute {
             val file = File(cacheDir, APK_ASSET_NAME)
             try {
@@ -737,38 +740,30 @@ class MainActivity : Activity() {
                 connection.inputStream.use { input -> file.outputStream().use { output -> input.copyTo(output) } }
                 connection.disconnect()
 
+                if (!file.exists() || file.length() == 0L) {
+                    mainHandler.post {
+                        Toast.makeText(this@MainActivity, "Ошибка: файл обновления пуст.", Toast.LENGTH_LONG).show()
+                    }
+                    return@execute
+                }
+
                 val uri = FileProvider.getUriForFile(this, "${BuildConfig.APPLICATION_ID}.fileprovider", file)
                 mainHandler.post {
                     try {
-                        val pm = packageManager
-                        val packageInfo = pm.getPackageInfo(BuildConfig.APPLICATION_ID, 0)
-                        val oldVersionCode = packageInfo.versionCode
-                        val newVersionCode = file.nameWithoutExtension.substringAfterLast('.').toIntOrNull() ?: 0
-
-                        if (newVersionCode > oldVersionCode) {
-                            val intent = Intent(Intent.ACTION_INSTALL_PACKAGE).apply {
-                                setDataAndType(uri, "application/vnd.android.package-archive")
-                                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-                                putExtra(Intent.EXTRA_NOT_UNKNOWN_SOURCE, true)
-                                putExtra(Intent.EXTRA_RETURN_RESULT, true)
+                        val intent = Intent(Intent.ACTION_VIEW).apply {
+                            setDataAndType(uri, "application/vnd.android.package-archive")
+                            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                            addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP)
+                            addFlags(Intent.FLAG_ACTIVITY_CLEAR_TASK)
+                        }
+                        try {
+                            startActivity(intent)
+                            finishAffinity()
+                        } catch (e: Exception) {
+                            mainHandler.post {
+                                Toast.makeText(this@MainActivity, "Ошибка запуска установщика: ${e.message}", Toast.LENGTH_LONG).show()
                             }
-                            try {
-                                startActivity(intent)
-                                finishAffinity()
-                            } catch (e: Exception) {
-                                val fallbackIntent = Intent(Intent.ACTION_VIEW).apply {
-                                    setDataAndType(uri, "application/vnd.android.package-archive")
-                                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                                    addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-                                    addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP)
-                                    addFlags(Intent.FLAG_ACTIVITY_CLEAR_TASK)
-                                }
-                                startActivity(fallbackIntent)
-                                finishAffinity()
-                            }
-                        } else {
-                            Toast.makeText(this@MainActivity, "У вас уже установлена эта или более новая версия.", Toast.LENGTH_LONG).show()
                         }
                     } catch (e: Exception) {
                         mainHandler.post {
@@ -778,7 +773,8 @@ class MainActivity : Activity() {
                 }
             } catch (e: Exception) {
                 mainHandler.post {
-                    Toast.makeText(this@MainActivity, "Ошибка загрузки обновления: ${e.message ?: "неизвестная ошибка"}", Toast.LENGTH_LONG).show()
+                    val errorMsg = if (e.message != null) e.message else "неизвестная ошибка"
+                    Toast.makeText(this@MainActivity, "Ошибка загрузки обновления: $errorMsg", Toast.LENGTH_LONG).show()
                 }
             }
         }
