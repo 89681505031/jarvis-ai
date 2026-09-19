@@ -902,6 +902,29 @@ class MainActivity : Activity() {
             return if (allowed) "Приложение добавлено в JARVIS." else "Приложение удалено из JARVIS."
         }
 
+        @JavascriptInterface fun setUserName(name: String): String {
+            val clean = name.trim()
+            if (clean.isNotBlank()) {
+                memory.setUserName(clean.split(" ").first())
+                return "Имя сохранено: $clean"
+            }
+            return "Введите имя."
+        }
+
+        @JavascriptInterface fun getUserName(): String = memory.getUserName()
+
+        @JavascriptInterface fun addAllAppsAllowed(): String {
+            val apps = router.launcherApps()
+            var count = 0
+            for (app in apps) {
+                if (!router.isAppAllowed(app.packageName)) {
+                    router.setAppAllowed(app.packageName, true)
+                    count++
+                }
+            }
+            return "Добавлено $count приложений в JARVIS."
+        }
+
         @JavascriptInterface fun enableAccessibility(): String {
             openAccessibilitySettings()
             return "Откройте J.A.R.V.I.S. в специальных возможностях Android и включите доступ."

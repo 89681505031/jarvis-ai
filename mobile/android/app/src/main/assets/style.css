@@ -2,3 +2,6 @@
 .bottom-nav button{border:1px solid #28485d;background:#0b1118;color:#9fe4ff;border-radius:12px;padding:12px 4px;font-size:13px;font-weight:700;cursor:pointer}background:#070a0eec;border-top:1px solid #17232c;backdrop-filter:blur(10px)}.bottom-nav button{border:0;background:transparent;color:#70818d;padding:8px 2px;font-size:11px}.bottom-nav button.active{color:#9fe4ff}@media(max-width:420px){.brand{font-size:20px}.mode{font-size:11px}.orb-wrap{min-height:260px}.orb{width:145px;height:145px}}
 .window-panel{position:fixed;top:12px;left:50%;transform:translateX(-50%);width:min(680px,calc(100% - 24px));max-height:calc(100vh - 110px);overflow:auto;z-index:60;box-shadow:0 20px 60px rgba(0,0,0,.65)}
 .apps-search{width:100%;background:#05080c;border:1px solid #243746;border-radius:14px;padding:13px;color:#fff;outline:none;min-height:52px;margin-bottom:10px}
+.api-field{margin-bottom:12px}
+.api-field label{display:block;color:#9fe4ff;font-size:13px;margin-bottom:6px;font-weight:700}
+.api-field input{width:100%;background:#05080c;border:1px solid #243746;border-radius:12px;padding:12px;color:#fff;outline:none;font-size:14px}

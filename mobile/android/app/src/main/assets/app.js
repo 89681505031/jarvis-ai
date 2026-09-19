@@ -2,7 +2,7 @@ const state={mode:'phone',persona:getPersona()||'J.A.R.V.I.S.',waitingForCommand
 function getPersona(){try{return localStorage.getItem('jarvisPersona')}catch(e){return null}}
 function setPersonaVal(v){try{localStorage.setItem('jarvisPersona',v)}catch(e){}}
 const $=id=>document.getElementById(id);
-const message=$('message'),command=$('command'),send=$('send'),modeButton=$('modeButton'),modeNav=$('modeNav'),appsNav=$('appsNav'),commandsNav=$('commandsNav'),appsPanel=$('appsPanel'),commandsPanel=$('commandsPanel'),appsList=$('appsList'),refreshApps=$('refreshApps'),settingsNav=$('settingsNav'),settingsPanel=$('settingsPanel'),personaList=$('personaList'),orbButton=$('orbButton'),fishApiKey=$('fishApiKey'),gigaApiKey=$('gigaApiKey'),saveApiKeys=$('saveApiKeys'),checkUpdates=$('checkUpdates'),apiStatus=$('apiStatus');
+const message=$('message'),command=$('command'),send=$('send'),modeButton=$('modeButton'),modeNav=$('modeNav'),appsNav=$('appsNav'),commandsNav=$('commandsNav'),appsPanel=$('appsPanel'),commandsPanel=$('commandsPanel'),appsList=$('appsList'),refreshApps=$('refreshApps'),settingsNav=$('settingsNav'),settingsPanel=$('settingsPanel'),personaList=$('personaList'),orbButton=$('orbButton'),fishApiKey=$('fishApiKey'),gigaApiKey=$('gigaApiKey'),saveApiKeys=$('saveApiKeys'),checkUpdates=$('checkUpdates'),apiStatus=$('apiStatus'),userNameInput=$('userNameInput'),saveUserNameBtn=$('saveUserName'),userNameStatus=$('userNameStatus'),addAllAppsBtn=$('addAllAppsBtn');
 const personas=[['J.A.R.V.I.S.','Стандартный'],['Astra','Творческий'],['Luna','Аналитический'],['Terra','Практичный'],['Cyber','Безопасность']];
 
 function showMessage(text){message.textContent=text||''}
@@ -110,7 +110,19 @@ function loadPersonas(){
     try{const s=JSON.parse(window.AndroidJarvis.getApiKeyStatus());apiStatus.textContent='Fish Audio: '+(s.fish?'✓ настроен':'не настроен')+' · GigaChat: '+(s.giga?'✓ настроен':'не настроен')}catch(e){}
   }
 }
-function toggleSettings(){appsPanel.hidden=true;commandsPanel.hidden=true;settingsPanel.hidden=!settingsPanel.hidden;if(!settingsPanel.hidden)loadPersonas()}
+function toggleSettings(){appsPanel.hidden=true;commandsPanel.hidden=true;settingsPanel.hidden=!settingsPanel.hidden;if(!settingsPanel.hidden){loadPersonas();loadUserName()}}
+function loadUserName(){
+  if(window.AndroidJarvis&&typeof window.AndroidJarvis.getUserName==='function'){
+    try{const name=window.AndroidJarvis.getUserName();if(name){userNameInput.value=name;userNameStatus.textContent='Привет, '+name+'!'}}catch(e){}
+  }
+}
+function saveUserName(){
+  const name=userNameInput.value.trim();
+  if(!name){userNameStatus.textContent='Введите имя.';return}
+  if(window.AndroidJarvis&&typeof window.AndroidJarvis.setUserName==='function'){
+    try{userNameStatus.textContent=window.AndroidJarvis.setUserName(name);userNameInput.value=''}catch(e){userNameStatus.textContent='Ошибка: '+e.message}
+  }else{userNameStatus.textContent='Сохранение доступно в APK JARVIS.'}
+}
 function saveKeys(){
   const fish=fishApiKey.value.trim(),giga=gigaApiKey.value.trim();
   if(!fish&&!giga){apiStatus.textContent='Введите хотя бы один ключ.';return}
@@ -126,7 +138,14 @@ appsNav.addEventListener('click',toggleApps);
 commandsNav.addEventListener('click',toggleCommands);
 settingsNav.addEventListener('click',toggleSettings);
 refreshApps.addEventListener('click',loadApps);document.getElementById('appsSearch')?.addEventListener('input',filterApps);
+if(addAllAppsBtn)addAllAppsBtn.addEventListener('click',()=>{
+  if(window.AndroidJarvis&&typeof window.AndroidJarvis.addAllAppsAllowed==='function'){
+    try{showMessage(window.AndroidJarvis.addAllAppsAllowed());loadApps()}
+    catch(e){showMessage('Ошибка: '+e.message)}
+  }else{showMessage('Добавление всех приложений доступно в APK JARVIS.')}
+});
 saveApiKeys.addEventListener('click',saveKeys);
+if(saveUserNameBtn)saveUserNameBtn.addEventListener('click',saveUserName);
 checkUpdates.addEventListener('click',askUpdates);
 send.addEventListener('click',()=>sendCommand());
 command.addEventListener('keydown',e=>{if(e.key==='Enter')sendCommand()});
