@@ -1,0 +1,35 @@
+# JARVIS Ultimate Pro - Dependencies
+# Установить: pip install -r requirements.txt
+
+# UI
+tkinter
+Pillow>=9.0.0
+
+# Speech
+pyttsx3>=2.90
+SpeechRecognition>=3.10.0
+pyaudio>=0.2.13
+
+# TTS
+edge-tts>=6.1.0
+
+# System
+psutil>=5.9.0
+pyautogui>=0.9.54
+pystray>=0.19.4
+pygame>=2.5.0
+
+# Network
+requests>=2.31.0
+urllib3>=2.0.0
+
+# PDF/DOCX
+pypdf>=3.0.0
+python-docx>=0.8.11
+
+# Web
+pywebview>=6.0  # Опционально, для 3D Orb
+
+# Gesture Control
+mediapipe>=0.10.0
+opencv-python>=4.8.0

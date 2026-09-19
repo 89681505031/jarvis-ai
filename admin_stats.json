@@ -1,0 +1,50 @@
+{
+  "total_downloads": 0,
+  "total_licenses": 3,
+  "active_subscriptions": 3,
+  "trial_users": 0,
+  "users": {
+    "ыы": {
+      "type": "subscription",
+      "user_id": "ыы",
+      "key": "A205-2F82-4E11-AE66-6A6D-9664-E537-7169",
+      "start_date": "2026-09-13T05:38:09.870501",
+      "end_date": "2026-10-13T05:38:09.870501",
+      "activated": true,
+      "activated_at": "2026-09-13T05:38:09.870501"
+    },
+    "шр": {
+      "type": "subscription",
+      "user_id": "шр",
+      "key": "4097-10EC-CCD4-E723-05D6-4DBD-38B9-9244",
+      "start_date": "2026-09-13T05:51:52.115968",
+      "end_date": "2026-10-13T05:51:52.115968",
+      "activated": true,
+      "activated_at": "2026-09-13T05:51:52.115968"
+    },
+    "51CE548A-6326-460D-B2C5-E4A4D81B84F3": {
+      "type": "subscription",
+      "user_id": "51CE548A-6326-460D-B2C5-E4A4D81B84F3",
+      "key": "4E5F-80D6-482A-1C2B-1F07-B751-3D78-7431",
+      "start_date": "2026-09-13T06:00:04.928662",
+      "end_date": "2026-10-13T06:00:04.928662",
+      "activated": true,
+      "activated_at": "2026-09-13T06:00:04.928662"
+    }
+  },
+  "generated_keys": [
+    {
+      "key": "E0E4-54DC-F660-15E1-4AEE-E1F1-BD02-CA3C",
+      "user_id": "a@hotmail.com",
+      "date": "13.09.2026 05:37",
+      "timestamp": 1789245475
+    },
+    {
+      "key": "6036-4A94-3CDB-C9F4-B0E9-0D1F-217A-3643",
+      "user_id": "51CE548A-6326-460D-B2C5-E4A4D81B84F3",
+      "date": "13.09.2026 05:58",
+      "timestamp": 1789246738
+    }
+  ],
+  "last_updated": "2026-09-13T06:00:04.928662"
+}

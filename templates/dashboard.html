@@ -1,0 +1,241 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>J.A.R.V.I.S. PRO - Панель мониторинга</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #0f0c29, #302b63, #24243e);
+            color: #fff;
+            min-height: 100vh;
+        }
+        .header {
+            background: rgba(0, 0, 0, 0.3);
+            padding: 20px;
+            text-align: center;
+            border-bottom: 2px solid #00d4ff;
+        }
+        .header h1 {
+            font-size: 2.5em;
+            color: #00d4ff;
+            text-shadow: 0 0 20px rgba(0, 212, 255, 0.5);
+        }
+        .header p { color: #aaa; margin-top: 10px; }
+        .container { max-width: 1400px; margin: 0 auto; padding: 30px; }
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 20px;
+            margin-bottom: 40px;
+        }
+        .stat-card {
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 15px;
+            padding: 25px;
+            text-align: center;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            transition: all 0.3s;
+        }
+        .stat-card:hover {
+            transform: translateY(-5px);
+            border-color: #00d4ff;
+            box-shadow: 0 10px 30px rgba(0, 212, 255, 0.3);
+        }
+        .stat-icon { font-size: 3em; margin-bottom: 15px; }
+        .stat-value {
+            font-size: 2.5em;
+            font-weight: bold;
+            color: #00d4ff;
+            margin-bottom: 10px;
+        }
+        .stat-label { color: #aaa; font-size: 1.1em; }
+        .online-badge {
+            display: inline-block;
+            background: #10b981;
+            color: #fff;
+            padding: 5px 15px;
+            border-radius: 20px;
+            font-size: 0.9em;
+            margin-top: 10px;
+        }
+        .nav-buttons {
+            display: flex;
+            gap: 15px;
+            margin-bottom: 30px;
+            justify-content: center;
+        }
+        .nav-btn {
+            background: rgba(0, 212, 255, 0.2);
+            border: 2px solid #00d4ff;
+            color: #fff;
+            padding: 15px 30px;
+            border-radius: 10px;
+            text-decoration: none;
+            font-size: 1.1em;
+            transition: all 0.3s;
+        }
+        .nav-btn:hover {
+            background: #00d4ff;
+            color: #000;
+            transform: scale(1.05);
+        }
+        .users-table {
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 15px;
+            padding: 25px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        .users-table h2 {
+            color: #00d4ff;
+            margin-bottom: 20px;
+            font-size: 1.8em;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        th, td {
+            padding: 15px;
+            text-align: left;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        th {
+            background: rgba(0, 212, 255, 0.2);
+            color: #00d4ff;
+            font-weight: 600;
+        }
+        tr:hover { background: rgba(255, 255, 255, 0.05); }
+        .status-active { color: #10b981; font-weight: bold; }
+        .status-expired { color: #ef4444; font-weight: bold; }
+        .online-indicator {
+            display: inline-block;
+            width: 10px;
+            height: 10px;
+            background: #10b981;
+            border-radius: 50%;
+            margin-right: 8px;
+            animation: pulse 2s infinite;
+        }
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.3; }
+        }
+        .last-updated {
+            text-align: center;
+            color: #666;
+            margin-top: 30px;
+            font-size: 0.9em;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>🤖 J.A.R.V.I.S. PRO</h1>
+        <p>Панель мониторинга и управления подписками</p>
+    </div>
+    
+    <div class="container">
+        <div class="nav-buttons">
+            <a href="/" class="nav-btn">📊 Мониторинг</a>
+            <a href="/generate" class="nav-btn">🔑 Генератор ключей</a>
+            <a href="/activate" class="nav-btn">⚡ Активация</a>
+        </div>
+        
+        <div class="stats-grid">
+            <div class="stat-card">
+                <div class="stat-icon">📥</div>
+                <div class="stat-value">{{ stats.total_downloads }}</div>
+                <div class="stat-label">Скачиваний</div>
+            </div>
+            
+            <div class="stat-card">
+                <div class="stat-icon">👥</div>
+                <div class="stat-value">{{ stats.total_licenses }}</div>
+                <div class="stat-label">Всего лицензий</div>
+            </div>
+            
+            <div class="stat-card">
+                <div class="stat-icon">✅</div>
+                <div class="stat-value">{{ stats.active_subscriptions }}</div>
+                <div class="stat-label">Активных подписок</div>
+            </div>
+            
+            <div class="stat-card">
+                <div class="stat-icon">🟢</div>
+                <div class="stat-value">{{ online_users }}</div>
+                <div class="stat-label">Онлайн сейчас</div>
+                <div class="online-badge">LIVE</div>
+            </div>
+            
+            <div class="stat-card">
+                <div class="stat-icon">⏳</div>
+                <div class="stat-value">{{ stats.trial_users }}</div>
+                <div class="stat-label">Пользователей триала</div>
+            </div>
+            
+            <div class="stat-card">
+                <div class="stat-icon">🔑</div>
+                <div class="stat-value">{{ stats.generated_keys|length }}</div>
+                <div class="stat-label">Сгенерировано ключей</div>
+            </div>
+        </div>
+        
+        <div class="users-table">
+            <h2>👥 Пользователи</h2>
+            <table>
+                <thead>
+                    <tr>
+                        <th>ID</th>
+                        <th>Тип</th>
+                        <th>Ключ</th>
+                        <th>Истекает</th>
+                        <th>Осталось</th>
+                        <th>Статус</th>
+                        <th>Онлайн</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for user_id, user_data in stats.users.items() %}
+                    <tr>
+                        <td>{{ user_id }}</td>
+                        <td>{{ user_data.type }}</td>
+                        <td>{{ user_data.key[:16] }}...</td>
+                        <td>{{ user_data.end_date[:10] }}</td>
+                        <td>{{ ((user_data.end_date[:10]|strftime('%Y-%m-%d') - now)|days) if user_data.end_date else 'N/A' }}</td>
+                        <td class="{% if user_data.activated %}status-active{% else %}status-expired{% endif %}">
+                            {% if user_data.activated %}✅ Активна{% else %}❌ Истекла{% endif %}
+                        </td>
+                        <td>
+                            {% if user_data.last_active %}
+                                {% set last_active = datetime.fromisoformat(user_data.last_active) %}
+                                {% if (now - last_active).total_seconds() < 300 %}
+                                    <span class="online-indicator"></span>Онлайн
+                                {% else %}
+                                    Оффлайн
+                                {% endif %}
+                            {% else %}
+                                Оффлайн
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        
+        <div class="last-updated">
+            Последнее обновление: {{ stats.last_updated }}
+        </div>
+    </div>
+    
+    <script>
+        // Автообновление каждые 30 секунд
+        setTimeout(function() {
+            location.reload();
+        }, 30000);
+    </script>
+</body>
+</html>

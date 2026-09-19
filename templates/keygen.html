@@ -1,0 +1,443 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>J.A.R.V.I.S. PRO - Генератор ключей</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #0f0c29, #302b63, #244e5e);
+            color: #fff;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+        .header {
+            background: rgba(0, 0, 0, 0.4);
+            padding: 30px;
+            text-align: center;
+            border-bottom: 3px solid #00d4ff;
+            box-shadow: 0 4px 20px rgba(0, 212, 255, 0.3);
+        }
+        .header h1 { 
+            color: #00d4ff; 
+            font-size: 2.8em; 
+            text-shadow: 0 0 20px rgba(0, 212, 255, 0.5);
+            margin-bottom: 10px;
+        }
+        .header p { color: #aaa; font-size: 1.1em; }
+        .container { 
+            max-width: 900px; 
+            margin: 0 auto; 
+            padding: 40px 20px; 
+            flex: 1;
+        }
+        .generator-card {
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 20px;
+            padding: 50px;
+            border: 2px solid rgba(0, 212, 255, 0.3);
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
+        }
+        .generator-card h2 {
+            color: #00d4ff;
+            margin-bottom: 30px;
+            text-align: center;
+            font-size: 2.2em;
+        }
+        .form-group { margin-bottom: 30px; }
+        label {
+            display: block;
+            margin-bottom: 12px;
+            color: #ccc;
+            font-size: 1.2em;
+            font-weight: 500;
+        }
+        input[type="text"] {
+            width: 100%;
+            padding: 18px;
+            border: 2px solid rgba(255, 255, 255, 0.2);
+            border-radius: 12px;
+            background: rgba(0, 0, 0, 0.4);
+            color: #fff;
+            font-size: 1.2em;
+            transition: all 0.3s;
+        }
+        input[type="text"]:focus {
+            outline: none;
+            border-color: #00d4ff;
+            box-shadow: 0 0 20px rgba(0, 212, 255, 0.3);
+        }
+        .btn-generate {
+            width: 100%;
+            padding: 20px;
+            background: linear-gradient(135deg, #00d4ff, #0099cc);
+            border: none;
+            border-radius: 12px;
+            color: #000;
+            font-size: 1.4em;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.3s;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+        .btn-generate:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 15px 40px rgba(0, 212, 255, 0.6);
+        }
+        .btn-generate:active {
+            transform: translateY(0);
+        }
+        .key-display {
+            margin-top: 40px;
+            padding: 40px;
+            background: rgba(0, 0, 0, 0.5);
+            border-radius: 20px;
+            border: 3px solid #00ff88;
+            text-align: center;
+            box-shadow: 0 0 40px rgba(0, 255, 136, 0.2);
+            animation: fadeIn 0.5s ease-in;
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        .key-display h3 {
+            color: #00ff88;
+            margin-bottom: 25px;
+            font-size: 1.8em;
+            text-shadow: 0 0 10px rgba(0, 255, 136, 0.5);
+        }
+        .key-value {
+            font-family: 'Courier New', monospace;
+            font-size: 2.2em;
+            color: #00ff88;
+            background: rgba(0, 255, 136, 0.1);
+            padding: 25px;
+            border-radius: 12px;
+            word-break: break-all;
+            margin-bottom: 25px;
+            letter-spacing: 2px;
+            text-shadow: 0 0 10px rgba(0, 255, 136, 0.5);
+        }
+        .btn-copy {
+            padding: 18px 50px;
+            background: linear-gradient(135deg, #25D366, #128C7E);
+            border: none;
+            border-radius: 12px;
+            color: #fff;
+            font-size: 1.3em;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.3s;
+            text-transform: uppercase;
+        }
+        .btn-copy:hover {
+            transform: scale(1.05);
+            box-shadow: 0 10px 30px rgba(37, 211, 102, 0.5);
+        }
+        .user-info {
+            margin-top: 25px;
+            padding: 20px;
+            background: rgba(0, 212, 255, 0.15);
+            border-radius: 12px;
+            text-align: center;
+            color: #00d4ff;
+            font-size: 1.1em;
+        }
+        .history-section {
+            margin-top: 50px;
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 20px;
+            padding: 40px;
+            border: 2px solid rgba(255, 255, 255, 0.1);
+        }
+        .history-section h3 {
+            color: #00d4ff;
+            margin-bottom: 25px;
+            font-size: 1.8em;
+            text-align: center;
+        }
+        .key-item {
+            background: rgba(0, 0, 0, 0.3);
+            padding: 20px;
+            border-radius: 12px;
+            margin-bottom: 15px;
+            border-left: 4px solid #00d4ff;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            transition: all 0.3s;
+        }
+        .key-item:hover {
+            background: rgba(0, 212, 255, 0.1);
+            transform: translateX(5px);
+        }
+        .key-item-info {
+            flex: 1;
+        }
+        .key-item-key {
+            font-family: 'Courier New', monospace;
+            font-size: 1.3em;
+            color: #00ff88;
+            margin-bottom: 8px;
+        }
+        .key-item-user {
+            color: #aaa;
+            font-size: 0.95em;
+        }
+        .key-item-date {
+            color: #888;
+            font-size: 0.9em;
+            margin-top: 5px;
+        }
+        .btn-copy-small {
+            padding: 10px 20px;
+            background: #25D366;
+            border: none;
+            border-radius: 8px;
+            color: #fff;
+            font-size: 1em;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        .btn-copy-small:hover {
+            background: #128C7E;
+        }
+        .stats-bar {
+            display: flex;
+            justify-content: center;
+            gap: 40px;
+            margin-bottom: 40px;
+            flex-wrap: wrap;
+        }
+        .stat-item {
+            background: rgba(0, 212, 255, 0.1);
+            padding: 20px 40px;
+            border-radius: 15px;
+            border: 2px solid rgba(0, 212, 255, 0.3);
+            text-align: center;
+        }
+        .stat-number {
+            font-size: 2.5em;
+            font-weight: bold;
+            color: #00d4ff;
+            text-shadow: 0 0 15px rgba(0, 212, 255, 0.5);
+        }
+        .stat-label {
+            color: #aaa;
+            font-size: 1em;
+            margin-top: 8px;
+        }
+        .footer {
+            background: rgba(0, 0, 0, 0.4);
+            padding: 20px;
+            text-align: center;
+            color: #666;
+            font-size: 0.9em;
+            border-top: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        @media (max-width: 768px) {
+            .header h1 { font-size: 2em; }
+            .generator-card { padding: 30px 20px; }
+            .key-value { font-size: 1.5em; }
+            .stats-bar { gap: 20px; }
+            .stat-item { padding: 15px 25px; }
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>🔑 J.A.R.V.I.S. PRO</h1>
+        <p>Генератор ключей активации</p>
+    </div>
+    
+    <div class="container">
+        <div class="stats-bar">
+            <div class="stat-item">
+                <div class="stat-number" id="totalKeys">0</div>
+                <div class="stat-label">Всего ключей</div>
+            </div>
+            <div class="stat-item">
+                <div class="stat-number" id="totalUsers">0</div>
+                <div class="stat-label">Покупателей</div>
+            </div>
+        </div>
+        
+        <div class="generator-card">
+            <h2>⚡ Генерация нового ключа</h2>
+            
+            <div class="form-group">
+                <label for="user_id">👤 ID ПОКУПАТЕЛЯ (имя/email/телефон/Telegram):</label>
+                <input type="text" id="user_id" placeholder="Например: ivan@gmail.com или @username">
+            </div>
+            
+            <button class="btn-generate" onclick="generateKey()">
+                🚀 СГЕНЕРИРОВАТЬ КЛЮЧ
+            </button>
+            
+            <div id="result" style="display: none;">
+                <div class="key-display">
+                    <h3>✅ КЛЮЧ АКТИВАЦИИ СГЕНЕРИРОВАН:</h3>
+                    <div class="key-value" id="generatedKey"></div>
+                    <button class="btn-copy" onclick="copyKey()">
+                        📋 КОПИРОВАТЬ КЛЮЧ
+                    </button>
+                    <div class="user-info">
+                        👤 Покупатель: <strong id="userIdDisplay"></strong>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="history-section">
+            <h3>📋 ИСТОРИЯ ГЕНЕРАЦИИ</h3>
+            <div id="historyList"></div>
+        </div>
+    </div>
+    
+    <div class="footer">
+        © 2024 J.A.R.V.I.S. PRO | Все права защищены
+    </div>
+    
+    <script>
+        let currentKey = '';
+        
+        // Загрузка статистики и истории при загрузке страницы
+        window.onload = function() {
+            loadStats();
+            loadHistory();
+        };
+        
+        async function loadStats() {
+            try {
+                const response = await fetch('/api/stats');
+                const data = await response.json();
+                document.getElementById('totalKeys').textContent = data.total_keys;
+                document.getElementById('totalUsers').textContent = data.unique_users;
+            } catch (error) {
+                console.error('Ошибка загрузки статистики:', error);
+            }
+        }
+        
+        async function loadHistory() {
+            try {
+                const response = await fetch('/api/keys');
+                const keys = await response.json();
+                
+                const historyList = document.getElementById('historyList');
+                historyList.innerHTML = '';
+                
+                // Показываем последние 20 ключей в обратном порядке
+                const recentKeys = keys.slice(-20).reverse();
+                
+                if (recentKeys.length === 0) {
+                    historyList.innerHTML = '<p style="text-align: center; color: #666; padding: 40px;">Пока нет сгенерированных ключей</p>';
+                    return;
+                }
+                
+                recentKeys.forEach(item => {
+                    const keyItem = document.createElement('div');
+                    keyItem.className = 'key-item';
+                    keyItem.innerHTML = `
+                        <div class="key-item-info">
+                            <div class="key-item-key">${item.key}</div>
+                            <div class="key-item-user">👤 ${item.user_id}</div>
+                            <div class="key-item-date">📅 ${item.date}</div>
+                        </div>
+                        <button class="btn-copy-small" onclick="copyToClipboard('${item.key}')">📋</button>
+                    `;
+                    historyList.appendChild(keyItem);
+                });
+            } catch (error) {
+                console.error('Ошибка загрузки истории:', error);
+            }
+        }
+        
+        async function generateKey() {
+            const userId = document.getElementById('user_id').value.trim();
+            
+            if (!userId) {
+                alert('⚠️ Введите ID покупателя!');
+                return;
+            }
+            
+            const btn = document.querySelector('.btn-generate');
+            btn.textContent = '⏳ ГЕНЕРАЦИЯ...';
+            btn.disabled = true;
+            
+            try {
+                const response = await fetch('/generate', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ user_id: userId })
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    currentKey = data.key;
+                    document.getElementById('generatedKey').textContent = data.key;
+                    document.getElementById('userIdDisplay').textContent = data.user_id;
+                    document.getElementById('result').style.display = 'block';
+                    
+                    // Обновляем статистику и историю
+                    loadStats();
+                    loadHistory();
+                }
+            } catch (error) {
+                console.error('Ошибка генерации:', error);
+                alert('❌ Ошибка при генерации ключа!');
+            } finally {
+                btn.textContent = '🚀 СГЕНЕРИРОВАТЬ КЛЮЧ';
+                btn.disabled = false;
+            }
+        }
+        
+        function copyKey() {
+            copyToClipboard(currentKey);
+        }
+        
+        function copyToClipboard(text) {
+            navigator.clipboard.writeText(text).then(() => {
+                const notification = document.createElement('div');
+                notification.style.cssText = `
+                    position: fixed;
+                    top: 20px;
+                    right: 20px;
+                    background: #25D366;
+                    color: white;
+                    padding: 15px 25px;
+                    border-radius: 10px;
+                    font-size: 1.1em;
+                    font-weight: bold;
+                    z-index: 10000;
+                    box-shadow: 0 5px 20px rgba(37, 211, 102, 0.5);
+                    animation: slideIn 0.3s ease-out;
+                `;
+                notification.textContent = '✅ Скопировано!';
+                document.body.appendChild(notification);
+                
+                setTimeout(() => {
+                    notification.remove();
+                }, 2000);
+            }).catch(err => {
+                console.error('Ошибка копирования:', err);
+                // Fallback для старых браузеров
+                const textarea = document.createElement('textarea');
+                textarea.value = text;
+                document.body.appendChild(textarea);
+                textarea.select();
+                document.execCommand('copy');
+                document.body.removeChild(textarea);
+                alert('✅ Ключ скопирован!');
+            });
+        }
+    </script>
+</body>
+</html>

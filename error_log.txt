@@ -1,0 +1,6 @@
+2026-09-17 06:31:07,139 [ERROR] [ERR] No available Gemini model
+2026-09-17 06:31:07,146 [INFO] ✅ GigaChat подключён (основной AI)
+2026-09-17 06:31:11,044 [INFO] 🤖 [HYBRID AI] GigaChat: ✅ Активен
+2026-09-17 06:31:11,045 [INFO] 🤖 [HYBRID AI] Приоритет: GigaChat (основной) → Gemini (резервный)
+2026-09-17 06:31:18,863 [INFO] 🔄 [HYBRID] Пробуем GigaChat...
+2026-09-17 06:31:22,240 [INFO] ✅ [HYBRID] GigaChat ответил: 89 символов

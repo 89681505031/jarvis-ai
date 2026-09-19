@@ -1,0 +1,77 @@
+name: Build JARVIS Android APK
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+    paths:
+      - 'mobile/android/**'
+      - '.github/workflows/build-android.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: mobile/android
+
+    env:
+      JARVIS_VERSION_CODE: ${{ github.run_number }}
+      JARVIS_VERSION_NAME: 0.2.${{ github.run_number }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Install Gradle 8.9
+        shell: bash
+        run: |
+          set -e
+          curl -fsSL -o /tmp/gradle.zip https://services.gradle.org/distributions/gradle-8.9-bin.zip
+          rm -rf /tmp/gradle-8.9
+          unzip -q /tmp/gradle.zip -d /tmp
+          echo "/tmp/gradle-8.9/bin" >> "$GITHUB_PATH"
+          gradle --version
+
+
+      - name: Build debug APK
+        run: gradle assembleDebug --no-daemon --no-build-cache
+
+      - name: Prepare APK
+        working-directory: ${{ github.workspace }}
+        run: cp mobile/android/app/build/outputs/apk/debug/app-debug.apk mobile/android/app/build/outputs/apk/debug/jarvis-phone.apk
+
+      - name: Upload APK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: jarvis-phone-debug
+          path: mobile/android/app/build/outputs/apk/debug/jarvis-phone.apk
+          if-no-files-found: error
+          retention-days: 7
+
+      - name: Publish GitHub Release
+        working-directory: ${{ github.workspace }}
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -e
+          TAG="mobile-v${JARVIS_VERSION_NAME}"
+          APK="mobile/android/app/build/outputs/apk/debug/jarvis-phone.apk"
+
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            gh release upload "$TAG" "$APK" --clobber
+          else
+            gh release create "$TAG" "$APK" \
+              --title "JARVIS Android ${JARVIS_VERSION_NAME}" \
+              --notes "Автоматическая сборка JARVIS Android. Версия ${JARVIS_VERSION_NAME}."
+          fi

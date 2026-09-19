@@ -1,0 +1,4 @@
+# Wake Word Dependencies
+pvporcupine==3.0.5
+pvrecorder==1.2.7
+playsound==1.2.2

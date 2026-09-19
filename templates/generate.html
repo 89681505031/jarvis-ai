@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>J.A.R.V.I.S. PRO - Генератор ключей</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #0f0c29, #302b63, #24243e);
+            color: #fff;
+            min-height: 100vh;
+        }
+        .header {
+            background: rgba(0, 0, 0, 0.3);
+            padding: 20px;
+            text-align: center;
+            border-bottom: 2px solid #00d4ff;
+        }
+        .header h1 { color: #00d4ff; font-size: 2.5em; }
+        .container { max-width: 800px; margin: 0 auto; padding: 40px; }
+        .nav-buttons {
+            display: flex;
+            gap: 15px;
+            margin-bottom: 30px;
+            justify-content: center;
+        }
+        .nav-btn {
+            background: rgba(0, 212, 255, 0.2);
+            border: 2px solid #00d4ff;
+            color: #fff;
+            padding: 15px 30px;
+            border-radius: 10px;
+            text-decoration: none;
+            font-size: 1.1em;
+            transition: all 0.3s;
+        }
+        .nav-btn:hover {
+            background: #00d4ff;
+            color: #000;
+        }
+        .form-card {
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 15px;
+            padding: 40px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        .form-card h2 {
+            color: #00d4ff;
+            margin-bottom: 30px;
+            text-align: center;
+            font-size: 2em;
+        }
+        .form-group { margin-bottom: 25px; }
+        label {
+            display: block;
+            margin-bottom: 10px;
+            color: #aaa;
+            font-size: 1.1em;
+        }
+        input[type="text"] {
+            width: 100%;
+            padding: 15px;
+            border: 2px solid rgba(255, 255, 255, 0.2);
+            border-radius: 10px;
+            background: rgba(0, 0, 0, 0.3);
+            color: #fff;
+            font-size: 1.1em;
+        }
+        input[type="text"]:focus {
+            outline: none;
+            border-color: #00d4ff;
+        }
+        .btn-generate {
+            width: 100%;
+            padding: 18px;
+            background: linear-gradient(135deg, #00d4ff, #0099cc);
+            border: none;
+            border-radius: 10px;
+            color: #000;
+            font-size: 1.3em;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        .btn-generate:hover {
+            transform: scale(1.02);
+            box-shadow: 0 10px 30px rgba(0, 212, 255, 0.5);
+        }
+        .key-display {
+            margin-top: 30px;
+            padding: 30px;
+            background: rgba(0, 0, 0, 0.4);
+            border-radius: 15px;
+            border: 2px solid #00ff88;
+            text-align: center;
+        }
+        .key-display h3 {
+            color: #00ff88;
+            margin-bottom: 20px;
+            font-size: 1.5em;
+        }
+        .key-value {
+            font-family: 'Courier New', monospace;
+            font-size: 2em;
+            color: #00ff88;
+            background: rgba(0, 255, 136, 0.1);
+            padding: 20px;
+            border-radius: 10px;
+            word-break: break-all;
+            margin-bottom: 20px;
+        }
+        .btn-copy {
+            padding: 15px 40px;
+            background: #25D366;
+            border: none;
+            border-radius: 10px;
+            color: #fff;
+            font-size: 1.2em;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        .btn-copy:hover {
+            background: #128C7E;
+            transform: scale(1.05);
+        }
+        .user-info {
+            margin-top: 20px;
+            padding: 15px;
+            background: rgba(0, 212, 255, 0.1);
+            border-radius: 10px;
+            text-align: center;
+            color: #00d4ff;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>🔑 Генератор ключей J.A.R.V.I.S. PRO</h1>
+    </div>
+    
+    <div class="container">
+        <div class="nav-buttons">
+            <a href="/" class="nav-btn">📊 Мониторинг</a>
+            <a href="/generate" class="nav-btn">🔑 Генератор ключей</a>
+            <a href="/activate" class="nav-btn">⚡ Активация</a>
+        </div>
+        
+        <div class="form-card">
+            <h2>🎯 Генерация нового ключа</h2>
+            
+            <form method="POST">
+                <div class="form-group">
+                    <label for="user_id">ID ПОКУПАТЕЛЯ (имя/email/телефон/Telegram):</label>
+                    <input type="text" id="user_id" name="user_id" 
+                           value="{{ user_id }}" 
+                           placeholder="Например: ivan@gmail.com или @username">
+                </div>
+                
+                <button type="submit" class="btn-generate">
+                    ⚡ СГЕНЕРИРОВАТЬ КЛЮЧ
+                </button>
+            </form>
+            
+            {% if generated_key %}
+            <div class="key-display">
+                <h3>✅ КЛЮЧ АКТИВАЦИИ СГЕНЕРИРОВАН:</h3>
+                <div class="key-value">{{ generated_key }}</div>
+                <button class="btn-copy" onclick="copyKey()">
+                    📋 КОПИРОВАТЬ КЛЮЧ
+                </button>
+                <div class="user-info">
+                    👤 Покупатель: <strong>{{ user_id }}</strong>
+                </div>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+    
+    <script>
+        function copyKey() {
+            const key = document.querySelector('.key-value').textContent;
+            navigator.clipboard.writeText(key).then(() => {
+                alert('✅ Ключ скопирован в буфер обмена!');
+            });
+        }
+    </script>
+</body>
+</html>

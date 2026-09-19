@@ -1,0 +1,100 @@
+2026-09-17 06:25:23,315 [INFO] AFC is enabled with max remote calls: 10.
+2026-09-17 06:25:23,812 [INFO] HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:generateContent "HTTP/1.1 429 Too Many Requests"
+2026-09-17 06:25:23,812 [ERROR] [ERR] No available Gemini model
+2026-09-17 06:25:23,812 [WARNING] ⚠️ Gemini недоступен
+2026-09-17 06:25:23,813 [INFO] ✅ GigaChat подключён (основной AI)
+2026-09-17 06:25:23,813 [INFO]    API ключ: MDFhMDU5YjItYjhjNy03...
+2026-09-17 06:30:55,666 [INFO] Система подписки JARVIS PRO подключена
+2026-09-17 06:30:56,560 [INFO] Imported existing <module 'comtypes.gen' from 'C:\\Users\\Пользователь\\AppData\\Local\\Packages\\PythonSoftwareFoundation.Python.3.13_qbz5n2kfra8p0\\LocalCache\\local-packages\\Python313\\site-packages\\comtypes\\gen\\__init__.py'>
+2026-09-17 06:30:56,560 [INFO] Using writeable comtypes cache directory: 'C:\Users\Пользователь\AppData\Local\Packages\PythonSoftwareFoundation.Python.3.13_qbz5n2kfra8p0\LocalCache\local-packages\Python313\site-packages\comtypes\gen'
+2026-09-17 06:30:58,140 [INFO] edge_tts подключён успешно
+2026-09-17 06:30:58,475 [INFO] FishAudio модуль загружен
+2026-09-17 06:30:58,475 [INFO] FishAudio модуль подключён
+2026-09-17 06:30:58,596 [INFO] ✅ Vosk модуль загружен
+2026-09-17 06:30:58,597 [INFO] 📁 Модель Vosk найдена: C:\vosk_models\vosk-model-small-ru-0.22
+2026-09-17 06:30:58,597 [INFO] ✅ Модель найдена и проверена: C:\vosk_models\vosk-model-small-ru-0.22
+2026-09-17 06:30:58,597 [INFO] 📍 Абсолютный путь: C:\vosk_models\vosk-model-small-ru-0.22
+2026-09-17 06:30:58,597 [INFO] 🔧 Инициализация vosk.Model...
+2026-09-17 06:30:59,193 [INFO] ✅ Модель загружена в память
+2026-09-17 06:30:59,194 [INFO] 🔧 Инициализация vosk.KaldiRecognizer...
+2026-09-17 06:30:59,273 [INFO] ✅ Vosk инициализирован успешно!
+2026-09-17 06:30:59,273 [INFO]    Модель: C:\vosk_models\vosk-model-small-ru-0.22
+2026-09-17 06:30:59,273 [INFO]    Sample rate: 16000 Hz
+2026-09-17 06:30:59,273 [INFO] ✅ Vosk модуль подключён и готов к работе!
+2026-09-17 06:30:59,273 [INFO]    Статус: ✅ Активен
+2026-09-17 06:31:04,634 [INFO] [OK] Gemini client initialized (direct connection)
+2026-09-17 06:31:05,587 [INFO]    API key: AQ.Ab8RN6J...g1WQw
+2026-09-17 06:31:05,604 [INFO] AFC is enabled with max remote calls: 10.
+2026-09-17 06:31:06,266 [INFO] HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent "HTTP/1.1 404 Not Found"
+2026-09-17 06:31:06,268 [INFO] AFC is enabled with max remote calls: 10.
+2026-09-17 06:31:06,648 [INFO] HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-pro-preview:generateContent "HTTP/1.1 429 Too Many Requests"
+2026-09-17 06:31:06,648 [INFO] AFC is enabled with max remote calls: 10.
+2026-09-17 06:31:07,138 [INFO] HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:generateContent "HTTP/1.1 429 Too Many Requests"
+2026-09-17 06:31:07,139 [ERROR] [ERR] No available Gemini model
+2026-09-17 06:31:07,139 [WARNING] ⚠️ Gemini недоступен
+2026-09-17 06:31:07,146 [INFO] ✅ GigaChat подключён (основной AI)
+2026-09-17 06:31:07,146 [INFO]    API ключ: MDFhMDU5YjItYjhjNy03...
+2026-09-17 06:31:07,227 [INFO] 🎭 [ИНИЦИАЛИЗАЦИЯ] Текущий персонаж: jarvis
+2026-09-17 06:31:07,228 [INFO] 🎤 [ИНИЦИАЛИЗАЦИЯ] Голоса персонажей: {'astra': 'd567e990d9ad433892ed15ecfd70ce54', 'luna': 'aa615eaff73f417e91cfbb4ea0e42df8', 'terra': 'ba06f8a589364f05847f08400288402a', 'cyber': 'b4b3cd5e89cc4fb682301b43e627d5ef'}
+2026-09-17 06:31:07,229 [INFO] 🎭 [ПАМЯТЬ] Загружен персонаж: jarvis
+2026-09-17 06:31:07,229 [INFO] 🌿 Инициализация ветвления диалога
+2026-09-17 06:31:07,230 [INFO] 🎤 [FISH] Инициализация Fish Audio TTS...
+2026-09-17 06:31:07,230 [INFO] 🎤 [FISH] API Key: sk-fish-TSwmQZcWu4ke...
+2026-09-17 06:31:07,230 [INFO] 🎤 [FISH] Model ID: 4c3eaacc1a0545cdb0295bfddf3e3785
+2026-09-17 06:31:09,267 [WARNING] ⚠️ Proxy недоступен, используется прямое подключение
+2026-09-17 06:31:11,042 [INFO] fish.audio API доступен! (status: 404)
+2026-09-17 06:31:11,044 [INFO] FishAudioTTS инициализирован: model=4c3eaacc1a0545cdb0295bfddf3e3785
+2026-09-17 06:31:11,044 [INFO] 🎤 [FISH] Fish TTS создан. Available: True
+2026-09-17 06:31:11,044 [INFO] 🎤 [FISH] Fish TTS enabled: True
+2026-09-17 06:31:11,044 [INFO] ✅ Fish Audio TTS активирован! Голос Джарвиса загружен.
+2026-09-17 06:31:11,044 [INFO] ✅ Vosk распознавание речи готово!
+2026-09-17 06:31:11,044 [INFO]    Теперь Jarvis будет использовать Vosk для распознавания
+2026-09-17 06:31:11,044 [INFO] 🤖 [HYBRID AI] GigaChat: ✅ Активен
+2026-09-17 06:31:11,045 [INFO] 🤖 [HYBRID AI] Gemini: ❌ Неактивен
+2026-09-17 06:31:11,045 [INFO] 🤖 [HYBRID AI] Приоритет: GigaChat (основной) → Gemini (резервный)
+2026-09-17 06:31:11,362 [INFO] 🎤 Кастомный голос установлен: 4c3eaacc1a0545cdb0295bfddf3e3785
+2026-09-17 06:31:11,362 [INFO] 🎤 [FISH AUDIO] Персонаж: jarvis
+2026-09-17 06:31:11,363 [INFO] 🎤 [FISH AUDIO] Голос ID: 4c3eaacc1a0545cdb0295bfddf3e3785
+2026-09-17 06:31:11,363 [INFO] 🎤 [FISH AUDIO] Fish TTS доступен: True
+2026-09-17 06:31:11,363 [INFO] 🎤 [FISH AUDIO] API ключ установлен: True
+2026-09-17 06:31:11,363 [INFO] 🎵 [TTS] ПЕРВИЧНЫЙ FISH AUDIO: Приветствую вас, сэр. Все системы функционируют в ...
+2026-09-17 06:31:11,364 [INFO] 🎤 [FISH API] reference_id: 4c3eaacc1a0545cdb0295bfddf3e3785
+2026-09-17 06:31:11,364 [INFO] 🎤 [FISH API] custom_voice_id: 4c3eaacc1a0545cdb0295bfddf3e3785
+2026-09-17 06:31:11,364 [INFO] 🎤 [FISH API] model_id: 4c3eaacc1a0545cdb0295bfddf3e3785
+2026-09-17 06:31:11,364 [INFO] Отправка запроса к fish.audio: Приветствую вас, сэр. Все системы функционируют в ...
+2026-09-17 06:31:11,635 [INFO] Микрофон подключён: устройство None
+2026-09-17 06:31:13,002 [INFO] Речь сгенерирована: C:\Users\Пользователь\Desktop\Jarvis\sounds\temp_fish_1789594271363.mp3
+2026-09-17 06:31:13,005 [INFO] ✅ [FISH AUDIO] Успех! Файл: C:\Users\Пользователь\Desktop\Jarvis\sounds\temp_fish_1789594271363.mp3 (66454 байт)
+2026-09-17 06:31:13,005 [INFO] 💾 Сохранено в кэш TTS: Приветствую вас, сэр. Все системы функционируют в ...
+2026-09-17 06:31:13,361 [INFO] 🔄 Проверка обновлений...
+2026-09-17 06:31:16,247 [INFO] ⚠️ Не удалось проверить обновления (HTTP 404)
+2026-09-17 06:31:18,857 [INFO] Выполняю команду 1/1: ваивасм
+2026-09-17 06:31:18,860 [INFO] Команда не распознана стандартными методами, отправляю ИИ: ваивасм
+2026-09-17 06:31:18,861 [INFO] DEBUG: has_creator_name=False, has_creator_alias=False, has_question=False, has_command=False
+2026-09-17 06:31:18,861 [INFO] 🤖 [HYBRID] Отправляю запрос...
+2026-09-17 06:31:18,861 [INFO] 🔍 [ask_gemini] START: GIGACHAT_OK=True, GEMINI_OK=False
+2026-09-17 06:31:18,861 [INFO] 🔍 [ask_gemini] user_message=ваивасм
+2026-09-17 06:31:18,861 [INFO] 📝 [ПАМЯТЬ] Проверка сообщения: 'ваивасм'
+2026-09-17 06:31:18,861 [INFO] 📝 [ПАМЯТЬ] ✅ Возможно имя (одное слово): Ваивасм
+2026-09-17 06:31:18,863 [INFO] 🔍 [ask_gemini] history loaded
+2026-09-17 06:31:18,863 [INFO] 🔍 [ask_gemini] Начинаю гибридный запрос...
+2026-09-17 06:31:18,863 [INFO] 🔄 [HYBRID] Пробуем GigaChat...
+2026-09-17 06:31:19,458 [INFO] 📝 [ПАМЯТЬ] Проверка сообщения: 'ваивасм'
+2026-09-17 06:31:19,458 [INFO] 📝 [ПАМЯТЬ] ✅ Возможно имя (одное слово): Ваивасм
+2026-09-17 06:31:20,274 [INFO] Фоновое слушание: начинаю запись...
+2026-09-17 06:31:22,240 [INFO] ✅ [HYBRID] GigaChat ответил: 89 символов
+2026-09-17 06:31:22,240 [INFO] ✅ AI: ответ получен
+2026-09-17 06:31:22,241 [INFO] 🎤 Кастомный голос установлен: 4c3eaacc1a0545cdb0295bfddf3e3785
+2026-09-17 06:31:22,241 [INFO] 🎤 [FISH AUDIO] Персонаж: jarvis
+2026-09-17 06:31:22,241 [INFO] 🎤 [FISH AUDIO] Голос ID: 4c3eaacc1a0545cdb0295bfddf3e3785
+2026-09-17 06:31:22,241 [INFO] 🎤 [FISH AUDIO] Fish TTS доступен: True
+2026-09-17 06:31:22,241 [INFO] 🎤 [FISH AUDIO] API ключ установлен: True
+2026-09-17 06:31:22,241 [INFO] 🎵 [TTS] ПЕРВИЧНЫЙ FISH AUDIO: Алекс, я вижу какую-то проблему с вводом. Возможно...
+2026-09-17 06:31:22,242 [INFO] 🎤 [FISH API] reference_id: 4c3eaacc1a0545cdb0295bfddf3e3785
+2026-09-17 06:31:22,242 [INFO] 🎤 [FISH API] custom_voice_id: 4c3eaacc1a0545cdb0295bfddf3e3785
+2026-09-17 06:31:22,242 [INFO] 🎤 [FISH API] model_id: 4c3eaacc1a0545cdb0295bfddf3e3785
+2026-09-17 06:31:22,242 [INFO] Отправка запроса к fish.audio: Алекс, я вижу какую-то проблему с вводом. Возможно...
+2026-09-17 06:31:24,613 [INFO] Речь сгенерирована: C:\Users\Пользователь\Desktop\Jarvis\sounds\temp_fish_1789594282241.mp3
+2026-09-17 06:31:24,616 [INFO] ✅ [FISH AUDIO] Успех! Файл: C:\Users\Пользователь\Desktop\Jarvis\sounds\temp_fish_1789594282241.mp3 (94457 байт)
+2026-09-17 06:31:24,616 [INFO] 💾 Сохранено в кэш TTS: Алекс, я вижу какую-то проблему с вводом. Возможно...
+2026-09-17 06:31:27,808 [INFO] Фоновое слушание: запись завершена, распознаю...
