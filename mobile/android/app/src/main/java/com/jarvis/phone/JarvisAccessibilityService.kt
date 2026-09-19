@@ -57,16 +57,33 @@ class JarvisAccessibilityService : AccessibilityService() {
     }
 
     private fun clickRecursive(node: AccessibilityNodeInfo, text: String): Boolean {
-        val nodeText = node.text?.toString()
-        val description = node.contentDescription?.toString()
-        if ((nodeText?.equals(text, ignoreCase = true) == true ||
-                    description?.equals(text, ignoreCase = true) == true) &&
-            node.isClickable) {
-            return node.performAction(AccessibilityNodeInfo.ACTION_CLICK)
-        }
+        val wanted = text.trim()
+        val nodeText = node.text?.toString()?.trim().orEmpty()
+        val description = node.contentDescription?.toString()?.trim().orEmpty()
+        val matches = wanted.isNotBlank() && (
+            nodeText.equals(wanted, ignoreCase = true) ||
+                description.equals(wanted, ignoreCase = true) ||
+                nodeText.contains(wanted, ignoreCase = true) ||
+                description.contains(wanted, ignoreCase = true)
+            )
+
+        if (matches && clickNodeOrParent(node)) return true
+
         for (i in 0 until node.childCount) {
             val child = node.getChild(i) ?: continue
-            if (clickRecursive(child, text)) return true
+            if (clickRecursive(child, wanted)) return true
+        }
+        return false
+    }
+
+    private fun clickNodeOrParent(node: AccessibilityNodeInfo): Boolean {
+        var current: AccessibilityNodeInfo? = node
+        repeat(5) {
+            val candidate = current ?: return false
+            if (candidate.isClickable && candidate.isEnabled &&
+                candidate.performAction(AccessibilityNodeInfo.ACTION_CLICK)
+            ) return true
+            current = candidate.parent
         }
         return false
     }
