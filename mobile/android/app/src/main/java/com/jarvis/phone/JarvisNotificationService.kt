@@ -15,7 +15,11 @@ class JarvisNotificationService : NotificationListenerService() {
         private const val PREFS = "jarvis_notifications"
         private const val KEY_MESSAGES = "messages"
         const val WHATSAPP = "com.whatsapp"
+        const val WHATSAPP_BUSINESS = "com.whatsapp.w4b"
         const val TELEGRAM = "org.telegram.messenger"
+
+        fun isWhatsApp(packageName: String): Boolean =
+            packageName == WHATSAPP || packageName == WHATSAPP_BUSINESS
 
         fun latest(limit: Int = 20): List<IncomingMessage> =
             messages.takeLast(limit.coerceAtLeast(0)).reversed()
@@ -45,11 +49,22 @@ class JarvisNotificationService : NotificationListenerService() {
 
     override fun onNotificationPosted(sbn: StatusBarNotification) {
         val packageName = sbn.packageName
-        if (packageName != WHATSAPP && packageName != TELEGRAM) return
+        if (!isWhatsApp(packageName) && packageName != TELEGRAM) return
 
         val extras = sbn.notification.extras
-        val title = extras.getString(Notification.EXTRA_TITLE)?.trim().orEmpty()
-        val text = extras.getCharSequence(Notification.EXTRA_TEXT)?.toString()?.trim().orEmpty()
+        val fallbackTitle = extras.getString(Notification.EXTRA_TITLE)?.trim().orEmpty()
+        val fallbackText = extras.getCharSequence(Notification.EXTRA_TEXT)?.toString()?.trim().orEmpty()
+
+        val styledMessage = try {
+            extras.getParcelableArray(Notification.EXTRA_MESSAGES)
+                ?.let { Notification.MessagingStyle.Message.getMessagesFromBundleArray(it) }
+                ?.lastOrNull()
+        } catch (_: Exception) {
+            null
+        }
+
+        val title = styledMessage?.sender?.toString()?.trim().orEmpty().ifBlank { fallbackTitle }
+        val text = styledMessage?.text?.toString()?.trim().orEmpty().ifBlank { fallbackText }
         if (title.isBlank() && text.isBlank()) return
 
         val notificationKey = "$packageName:${sbn.id}:${sbn.tag.orEmpty()}"
