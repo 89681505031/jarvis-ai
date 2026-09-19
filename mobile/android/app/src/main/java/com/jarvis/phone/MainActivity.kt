@@ -73,8 +73,6 @@ class MainActivity : Activity() {
                 })
             }
         }
-        setupSpeechRecognizer()
-
         webView = WebView(this).apply {
             settings.javaScriptEnabled = true
             settings.domStorageEnabled = true
@@ -86,7 +84,16 @@ class MainActivity : Activity() {
         }
         setContentView(webView)
         requestRuntimePermissions()
+        if (ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED) {
+            mainHandler.postDelayed({ initSpeechAfterPermissions() }, 300)
+        }
         mainHandler.postDelayed({ checkForUpdates(false) }, 1800)
+    }
+
+    private fun initSpeechAfterPermissions() {
+        if (ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED) {
+            setupSpeechRecognizer()
+        }
     }
 
     private fun setupSpeechRecognizer() {
@@ -358,6 +365,7 @@ class MainActivity : Activity() {
             ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED
 
         if (microphoneGranted) {
+            initSpeechAfterPermissions()
             runOnUiThread {
                 if (::webView.isInitialized) {
                     webView.evaluateJavascript(
@@ -367,7 +375,16 @@ class MainActivity : Activity() {
                 }
             }
             startWakeService()
-            mainHandler.postDelayed({ startWakeListening() }, 350)
+            mainHandler.postDelayed({ startWakeListening() }, 500)
+        } else {
+            runOnUiThread {
+                if (::webView.isInitialized) {
+                    webView.evaluateJavascript(
+                        "window.onJarvisSpeechError && window.onJarvisSpeechError(${JSONObject.quote("Доступ к микрофону не разрешён. Включите его в разрешениях Android для J.A.R.V.I.S.")})",
+                        null
+                    )
+                }
+            }
         } else {
             runOnUiThread {
                 if (::webView.isInitialized) {
@@ -675,9 +692,9 @@ class MainActivity : Activity() {
     private fun showUpdateDialog(title: String, downloadUrl: String) {
         AlertDialog.Builder(this)
             .setTitle("Доступно обновление")
-            .setMessage("$title\n\nТекущая версия: ${BuildConfig.VERSION_NAME}\nНовая версия доступна на GitHub.")
+            .setMessage("$title\n\nТекущая версия: ${BuildConfig.VERSION_NAME}\nНовая версия: ${title}")
             .setNegativeButton("Позже", null)
-            .setPositiveButton("Обновить") { _, _ -> downloadAndInstall(downloadUrl) }
+            .setPositiveButton("Обновить и перезапустить") { _, _ -> downloadAndInstallAuto(downloadUrl) }
             .show()
     }
 
@@ -711,6 +728,45 @@ class MainActivity : Activity() {
             } catch (e: Exception) {
                 mainHandler.post {
                     Toast.makeText(this, "Ошибка загрузки обновления: ${e.message ?: "неизвестная ошибка"}", Toast.LENGTH_LONG).show()
+                }
+            }
+        }
+    }
+
+    private fun downloadAndInstallAuto(downloadUrl: String) {
+        backgroundExecutor.execute {
+            val file = File(cacheDir, APK_ASSET_NAME)
+            try {
+                val connection = (URL(downloadUrl).openConnection() as HttpURLConnection).apply {
+                    connectTimeout = 15000
+                    readTimeout = 120000
+                    instanceFollowRedirects = true
+                    setRequestProperty("User-Agent", "JARVIS-Android")
+                }
+                connection.inputStream.use { input -> file.outputStream().use { output -> input.copyTo(output) } }
+                connection.disconnect()
+
+                val uri = FileProvider.getUriForFile(this, "${BuildConfig.APPLICATION_ID}.fileprovider", file)
+                mainHandler.post {
+                    try {
+                        val intent = Intent(Intent.ACTION_VIEW).apply {
+                            setDataAndType(uri, "application/vnd.android.package-archive")
+                            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                            addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP)
+                            addFlags(Intent.FLAG_ACTIVITY_CLEAR_TASK)
+                        }
+                        startActivity(intent)
+                        finishAffinity()
+                    } catch (e: Exception) {
+                        mainHandler.post {
+                            Toast.makeText(this@MainActivity, "Ошибка установки: ${e.message}", Toast.LENGTH_LONG).show()
+                        }
+                    }
+                }
+            } catch (e: Exception) {
+                mainHandler.post {
+                    Toast.makeText(this@MainActivity, "Ошибка загрузки обновления: ${e.message ?: "неизвестная ошибка"}", Toast.LENGTH_LONG).show()
                 }
             }
         }
@@ -872,10 +928,23 @@ class MainActivity : Activity() {
         @JavascriptInterface
         fun setApiKeys(fish: String, giga: String): String {
             val editor = prefs.edit()
-            if (fish.isNotBlank()) editor.putString("fish_api_key", fish)
-            if (giga.isNotBlank()) editor.putString("gigachat_api_key", giga)
-            editor.apply()
-            return "Fish Audio: ${if (fish.isNotBlank() || prefs.getString("fish_api_key", "").orEmpty().isNotBlank()) "✓ настроен" else "не настроен"} · GigaChat: ${if (giga.isNotBlank() || prefs.getString("gigachat_api_key", "").orEmpty().isNotBlank()) "✓ настроен" else "не настроен"}"
+            var fishSaved = false
+            var gigaSaved = false
+            if (fish.isNotBlank()) {
+                editor.putString("fish_api_key", fish)
+                fishSaved = true
+            }
+            if (giga.isNotBlank()) {
+                editor.putString("gigachat_api_key", giga)
+                gigaSaved = true
+            }
+            if (fishSaved || gigaSaved) {
+                editor.apply()
+                val fishStatus = if (fishSaved) "✓ сохранён" else "${if (prefs.getString("fish_api_key", "").orEmpty().isNotBlank()) "✓ настроен" else "не настроен"}"
+                val gigaStatus = if (gigaSaved) "✓ сохранён" else "${if (prefs.getString("gigachat_api_key", "").orEmpty().isNotBlank()) "✓ настроен" else "не настроен"}"
+                return "Fish Audio: $fishStatus · GigaChat: $gigaStatus"
+            }
+            return "Введите хотя бы один ключ."
         }
 
         @JavascriptInterface
