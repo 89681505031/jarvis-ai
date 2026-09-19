@@ -911,8 +911,6 @@ class MainActivity : Activity() {
             return "Введите имя."
         }
 
-        @JavascriptInterface fun getUserName(): String = memory.getUserName()
-
         @JavascriptInterface fun addAllAppsAllowed(): String {
             val apps = router.launcherApps()
             var count = 0
