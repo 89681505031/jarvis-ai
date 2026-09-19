@@ -385,15 +385,6 @@ class MainActivity : Activity() {
                     )
                 }
             }
-        } else {
-            runOnUiThread {
-                if (::webView.isInitialized) {
-                    webView.evaluateJavascript(
-                        "window.onJarvisSpeechError && window.onJarvisSpeechError(${JSONObject.quote("Доступ к микрофону не разрешён. Включите его в разрешениях Android для J.A.R.V.I.S.")})",
-                        null
-                    )
-                }
-            }
         }
     }
 
