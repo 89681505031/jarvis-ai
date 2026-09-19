@@ -40,6 +40,7 @@ class MainActivity : Activity() {
     private lateinit var gigaChat: GigaChatClient
     private var speechRecognizer: SpeechRecognizer? = null
     private var tts: TextToSpeech? = null
+    private var ttsReady = false
     private var selectedPersona = "J.A.R.V.I.S."
     private lateinit var fishAudioTts: FishAudioTts
     private lateinit var memory: JarvisMemory
@@ -62,7 +63,8 @@ class MainActivity : Activity() {
         fishAudioTts = FishAudioTts(this)
         memory = JarvisMemory(this)
         tts = TextToSpeech(this) { status ->
-            if (status == TextToSpeech.SUCCESS) {
+            ttsReady = status == TextToSpeech.SUCCESS
+            if (ttsReady) {
                 tts?.language = Locale("ru", "RU")
                 tts?.setOnUtteranceProgressListener(object : UtteranceProgressListener() {
                     override fun onStart(utteranceId: String?) { isSpeaking = true }
@@ -153,17 +155,25 @@ class MainActivity : Activity() {
             }
             override fun onResults(results: Bundle?) {
                 if (isSpeaking) return
+                val wasConversation = conversationUntil > System.currentTimeMillis() || manualListening
                 wakeListening = false
                 manualListening = false
+                conversationUntil = 0L
                 val text = results?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)?.firstOrNull()?.trim().orEmpty()
                 if (text.isBlank()) {
-                    if (conversationUntil > System.currentTimeMillis()) restartConversationListening() else restartWakeListening()
+                    restartWakeListening()
                     return
                 }
                 val escaped = JSONObject.quote(text)
-                if (conversationUntil > System.currentTimeMillis()) restartConversationListening() else restartWakeListening()
                 runOnUiThread {
-                    if (::webView.isInitialized) webView.evaluateJavascript("window.onJarvisSpeechResult && window.onJarvisSpeechResult($escaped)", null)
+                    if (::webView.isInitialized) {
+                        webView.evaluateJavascript("window.onJarvisSpeechResult && window.onJarvisSpeechResult($escaped)", null)
+                    }
+                    mainHandler.postDelayed({
+                        if (!isSpeaking && conversationUntil <= System.currentTimeMillis() && !manualListening) {
+                            restartWakeListening()
+                        }
+                    }, if (wasConversation) 650L else 350L)
                 }
             }
         })
@@ -301,9 +311,17 @@ class MainActivity : Activity() {
         } else {
             val systemTts = tts
             if (systemTts == null) {
-                // TTS may still be initializing when the first response arrives.
-                // Do not leave voice recognition permanently blocked in speaking mode.
                 finishSpeech()
+                return
+            }
+            if (!ttsReady) {
+                mainHandler.postDelayed({
+                    if (ttsReady && !isFinishing && !isDestroyed) {
+                        speak(text, resumeAfterSpeech)
+                    } else {
+                        finishSpeech()
+                    }
+                }, 600)
                 return
             }
             val result = systemTts.speak(
@@ -388,32 +406,55 @@ class MainActivity : Activity() {
         showVoiceStatus("Получаю свежие новости…")
         backgroundExecutor.execute {
             try {
-                val url = URL("https://news.google.com/rss?hl=ru&gl=RU&ceid=RU:ru")
-                val connection = (url.openConnection() as HttpURLConnection).apply {
-                    requestMethod = "GET"
-                    connectTimeout = 10_000
-                    readTimeout = 20_000
-                    setRequestProperty("User-Agent", "JARVIS-Android")
-                }
-                val code = connection.responseCode
-                val xml = connection.inputStream.bufferedReader(Charsets.UTF_8).use { it.readText() }
-                connection.disconnect()
-                if (code !in 200..299) throw IllegalStateException("HTTP $code")
+                val feeds = listOf(
+                    "https://news.google.com/rss?hl=ru&gl=RU&ceid=RU:ru",
+                    "https://news.google.com/rss?hl=ru&gl=US&ceid=US:ru"
+                )
+                var items = emptyList<String>()
+                var lastError: Exception? = null
 
-                val items = Regex("<item>([\\s\\S]*?)</item>", RegexOption.IGNORE_CASE)
-                    .findAll(xml)
-                    .mapNotNull { match ->
-                        val block = match.groupValues[1]
-                        val title = Regex("<title>([\\s\\S]*?)</title>", RegexOption.IGNORE_CASE)
-                            .find(block)?.groupValues?.get(1)?.let { Html.fromHtml(it, Html.FROM_HTML_MODE_LEGACY).toString().trim() }
-                        val source = Regex("<source[^>]*>([\\s\\S]*?)</source>", RegexOption.IGNORE_CASE)
-                            .find(block)?.groupValues?.get(1)?.let { Html.fromHtml(it, Html.FROM_HTML_MODE_LEGACY).toString().trim() }
-                        title?.takeIf { it.isNotBlank() }?.let { if (source.isNullOrBlank()) it else "$it — $source" }
+                for (feed in feeds) {
+                    try {
+                        val connection = (URL(feed).openConnection() as HttpURLConnection).apply {
+                            requestMethod = "GET"
+                            connectTimeout = 10_000
+                            readTimeout = 20_000
+                            instanceFollowRedirects = true
+                            setRequestProperty("User-Agent", "Mozilla/5.0 JARVIS-Android")
+                            setRequestProperty("Accept", "application/rss+xml, application/xml, text/xml")
+                        }
+                        val code = connection.responseCode
+                        val stream = if (code in 200..299) connection.inputStream else connection.errorStream
+                        val xml = stream?.bufferedReader(Charsets.UTF_8)?.use { it.readText() }.orEmpty()
+                        connection.disconnect()
+                        if (code !in 200..299) throw IllegalStateException("HTTP $code")
+
+                        items = Regex("<item>([\\s\\S]*?)</item>", RegexOption.IGNORE_CASE)
+                            .findAll(xml)
+                            .mapNotNull { match ->
+                                val block = match.groupValues[1]
+                                val title = Regex("<title>([\\s\\S]*?)</title>", RegexOption.IGNORE_CASE)
+                                    .find(block)?.groupValues?.get(1)
+                                    ?.replace("<![CDATA[", "")?.replace("]]>", "")
+                                    ?.let { Html.fromHtml(it, Html.FROM_HTML_MODE_LEGACY).toString().trim() }
+                                val source = Regex("<source[^>]*>([\\s\\S]*?)</source>", RegexOption.IGNORE_CASE)
+                                    .find(block)?.groupValues?.get(1)
+                                    ?.replace("<![CDATA[", "")?.replace("]]>", "")
+                                    ?.let { Html.fromHtml(it, Html.FROM_HTML_MODE_LEGACY).toString().trim() }
+                                title?.takeIf { it.isNotBlank() }?.let {
+                                    if (source.isNullOrBlank()) it else "$it — $source"
+                                }
+                            }
+                            .distinct()
+                            .take(6)
+                            .toList()
+                        if (items.isNotEmpty()) break
+                    } catch (e: Exception) {
+                        lastError = e
                     }
-                    .take(6)
-                    .toList()
+                }
 
-                if (items.isEmpty()) throw IllegalStateException("В новостной ленте нет материалов.")
+                if (items.isEmpty()) throw lastError ?: IllegalStateException("В новостной ленте нет материалов.")
                 val prompt = "Сделай краткую нейтральную голосовую сводку свежих новостей на русском языке. Назови 5-6 главных тем по заголовкам ниже, по 1-2 предложения на тему. Не придумывай факты и явно отделяй заголовок от неподтвержденных деталей. Заголовки: " + items.joinToString(" | ")
                 val answer = gigaChat.ask(prompt, selectedPersona, "")
                 val finalText = if (answer.startsWith("В настройках J.A.R.V.I.S.")) {
@@ -441,8 +482,12 @@ class MainActivity : Activity() {
         mainHandler.postDelayed({
             backgroundExecutor.execute {
                 val notification = JarvisNotificationService.latest(30)
-                    .firstOrNull { it.packageName == JarvisNotificationService.WHATSAPP }
-                val screen = JarvisAccessibilityService.instance?.visibleText().orEmpty()
+                    .firstOrNull { JarvisNotificationService.isWhatsApp(it.packageName) }
+                val screen = if (notification == null) {
+                    JarvisAccessibilityService.instance?.visibleText().orEmpty()
+                } else {
+                    ""
+                }
                 val source = buildString {
                     if (notification != null) {
                         append("Последнее уведомление WhatsApp. Отправитель/чат: ")
@@ -779,10 +824,14 @@ class MainActivity : Activity() {
                 normalized.contains("прочитай последнее сообщение в ватсап") ||
                 normalized.contains("прочитай последнее сообщение whatsapp")
             ) {
-                val result = router.execute(text)
-                if (result.startsWith("Открываю WhatsApp")) {
-                    analyzeLatestWhatsApp()
+                val hasStoredMessage = JarvisNotificationService.latest(30)
+                    .any { JarvisNotificationService.isWhatsApp(it.packageName) }
+                val result = if (hasStoredMessage) {
+                    "Читаю последнее сообщение WhatsApp."
+                } else {
+                    router.execute(text)
                 }
+                analyzeLatestWhatsApp()
                 memory.rememberTurn(memoryText, result)
                 return result
             }
