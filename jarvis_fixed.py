@@ -2354,6 +2354,121 @@ class JARVISUltimate(tk.Tk):
         )
         current_voice_lbl.pack(pady=(12, 0))
         
+        # === СЕКЦИЯ API КЛЮЧЕЙ ===
+        api_frame = tk.LabelFrame(
+            scrollable_frame,
+            text="🔑 API КЛЮЧИ",
+            font=("Segoe UI", 10, "bold"),
+            bg=self.panel_bg,
+            fg=self.accent_color,
+            padx=15,
+            pady=10
+        )
+        api_frame.pack(fill=tk.X, padx=20, pady=10)
+        
+        # GigaChat API Key
+        gigachat_frame = tk.Frame(api_frame, bg=self.panel_bg)
+        gigachat_frame.pack(fill=tk.X, pady=(0, 10))
+        
+        tk.Label(
+            gigachat_frame,
+            text="GigaChat API:",
+            font=("Segoe UI", 9),
+            bg=self.panel_bg,
+            fg="#94a3b8",
+            anchor="w"
+        ).pack(anchor="w", pady=(0, 5))
+        
+        self.gigachat_key_var = tk.StringVar(value=self.gigachat_auth_key)
+        tk.Entry(
+            gigachat_frame,
+            textvariable=self.gigachat_key_var,
+            font=("Segoe UI", 9),
+            bg="#0f172a",
+            fg="#e2e8f0",
+            relief=tk.SOLID,
+            bd=1,
+            show="*"
+        ).pack(fill=tk.X, pady=(0, 5))
+        
+        def save_gigachat_key():
+            new_key = self.gigachat_key_var.get().strip()
+            if new_key:
+                # Сохраняем в config.json
+                config_path = self._config_path()
+                try:
+                    config = {}
+                    if config_path.exists():
+                        with open(config_path, 'r', encoding='utf-8') as f:
+                            config = json.load(f)
+                    config['gigachat_auth_key'] = new_key
+                    with open(config_path, 'w', encoding='utf-8') as f:
+                        json.dump(config, f, ensure_ascii=False, indent=2)
+                except Exception as e:
+                    messagebox.showerror("Ошибка", f"Не удалось сохранить ключ GigaChat: {e}")
+                    return
+                
+                self.gigachat_auth_key = new_key
+                messagebox.showinfo("Успех", "API ключ GigaChat сохранён!")
+            else:
+                messagebox.showwarning("Внимание", "Ключ не может быть пустым")
+        
+        ModernButton(
+            gigachat_frame,
+            text="💾 Сохранить GigaChat",
+            command=save_gigachat_key,
+            bg="#059669",
+            fg="#fff",
+            padx=10,
+            pady=5
+        ).pack(fill=tk.X)
+        
+        # Fish Audio API Key
+        fish_frame2 = tk.Frame(api_frame, bg=self.panel_bg)
+        fish_frame2.pack(fill=tk.X, pady=(10, 0))
+        
+        tk.Label(
+            fish_frame2,
+            text="Fish Audio API:",
+            font=("Segoe UI", 9),
+            bg=self.panel_bg,
+            fg="#94a3b8",
+            anchor="w"
+        ).pack(anchor="w", pady=(0, 5))
+        
+        self.fish_api_key_var = tk.StringVar(value=self.fish_api_key)
+        tk.Entry(
+            fish_frame2,
+            textvariable=self.fish_api_key_var,
+            font=("Segoe UI", 9),
+            bg="#0f172a",
+            fg="#e2e8f0",
+            relief=tk.SOLID,
+            bd=1,
+            show="*"
+        ).pack(fill=tk.X, pady=(0, 5))
+        
+        def save_fish_key():
+            new_key = self.fish_api_key_var.get().strip()
+            if new_key:
+                self.fish_api_key = new_key
+                # Обновляем fish_tts если активен
+                if self.fish_tts:
+                    self.fish_tts.api_key = new_key
+                messagebox.showinfo("Успех", "API ключ Fish Audio сохранён!\nПерезапустите JARVIS для применения.")
+            else:
+                messagebox.showwarning("Внимание", "Ключ не может быть пустым")
+        
+        ModernButton(
+            fish_frame2,
+            text="💾 Сохранить Fish Audio",
+            command=save_fish_key,
+            bg="#7c3aed",
+            fg="#fff",
+            padx=10,
+            pady=5
+        ).pack(fill=tk.X)
+        
         # === ОСНОВНОЙ КОНТЕНТ С ПРОКРУТКОЙ ===
         # Создаём Canvas с прокруткой
         main_canvas = tk.Canvas(settings_win, bg=self.panel_bg, highlightthickness=0)
