@@ -2,7 +2,7 @@ const state={mode:'phone',persona:getPersona()||'J.A.R.V.I.S.',waitingForCommand
 function getPersona(){try{return localStorage.getItem('jarvisPersona')}catch(e){return null}}
 function setPersonaVal(v){try{localStorage.setItem('jarvisPersona',v)}catch(e){}}
 const $=id=>document.getElementById(id);
-const message=$('message'),command=$('command'),send=$('send'),modeButton=$('modeButton'),modeNav=$('modeNav'),appsNav=$('appsNav'),commandsNav=$('commandsNav'),appsPanel=$('appsPanel'),commandsPanel=$('commandsPanel'),appsList=$('appsList'),refreshApps=$('refreshApps'),settingsNav=$('settingsNav'),settingsPanel=$('settingsPanel'),personaList=$('personaList'),orbButton=$('orbButton'),fishApiKey=$('fishApiKey'),gigaApiKey=$('gigaApiKey'),saveApiKeys=$('saveApiKeys'),checkUpdates=$('checkUpdates'),apiStatus=$('apiStatus'),userNameInput=$('userNameInput'),saveUserNameBtn=$('saveUserName'),userNameStatus=$('userNameStatus'),addAllAppsBtn=$('addAllAppsBtn');
+const message=$('message'),command=$('command'),send=$('send'),modeButton=$('modeButton'),modeNav=$('modeNav'),appsNav=$('appsNav'),commandsNav=$('commandsNav'),appsPanel=$('appsPanel'),commandsPanel=$('commandsPanel'),appsList=$('appsList'),refreshApps=$('refreshApps'),settingsNav=$('settingsNav'),settingsPanel=$('settingsPanel'),personaList=$('personaList'),orbButton=$('orbButton'),fishApiKey=$('fishApiKey'),gigaApiKey=$('gigaApiKey'),saveApiKeys=$('saveApiKeys'),checkUpdates=$('checkUpdates'),apiStatus=$('apiStatus'),userNameInput=$('userNameInput'),saveUserNameBtn=$('saveUserName'),userNameStatus=$('userNameStatus'),addAllAppsBtn=$('addAllApps');
 const personas=[['J.A.R.V.I.S.','Стандартный'],['Astra','Творческий'],['Luna','Аналитический'],['Terra','Практичный'],['Cyber','Безопасность']];
 
 function showMessage(text){message.textContent=text||''}
@@ -73,7 +73,26 @@ function onSpeechResult(text){
 window.onJarvisSpeechResult=onSpeechResult;
 window.onGigaChatResult=function(text){showMessage(text)};
 
-function filterApps(){const q=(document.getElementById('appsSearch')?.value||'').trim().toLowerCase();document.querySelectorAll('#appsList .app-row').forEach(row=>{const n=(row.querySelector('span')?.textContent||'').toLowerCase();row.hidden=!!q&&!n.includes(q)})}
+function filterApps(){
+  const q=(document.getElementById('appsSearch')?.value||'').trim().toLowerCase();
+  const rows=document.querySelectorAll('#appsList .app-row');
+  let found=0;
+  rows.forEach(row=>{
+    const n=(row.querySelector('span')?.textContent||'').toLowerCase();
+    const match=!q||n.includes(q);
+    row.hidden=!match;
+    if(match)found++;
+  });
+  if(!appsPanel.querySelector('.app-empty')&&found===0&&q){
+    const noResult=document.createElement('div');
+    noResult.className='app-empty';
+    noResult.textContent='Ничего не найдено.';
+    appsPanel.appendChild(noResult);
+  }else{
+    const existing=appsPanel.querySelector('.app-empty');
+    if(existing&&found>0)existing.remove();
+  }
+}
 function loadApps(){
   if(!(window.AndroidJarvis&&typeof window.AndroidJarvis.listApps==='function')){appsList.innerHTML='<div class="app-empty">Список приложений доступен внутри APK JARVIS.</div>';return}
   try{
