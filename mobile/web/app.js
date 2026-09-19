@@ -1,4 +1,6 @@
-const state={mode:'phone',persona:localStorage.getItem('jarvisPersona')||'J.A.R.V.I.S.',waitingForCommand:false};
+const state={mode:'phone',persona:getPersona()||'J.A.R.V.I.S.',waitingForCommand:false};
+function getPersona(){try{return localStorage.getItem('jarvisPersona')}catch(e){return null}}
+function setPersonaVal(v){try{localStorage.setItem('jarvisPersona',v)}catch(e){}}
 const $=id=>document.getElementById(id);
 const message=$('message'),command=$('command'),send=$('send'),modeButton=$('modeButton'),modeNav=$('modeNav'),appsNav=$('appsNav'),commandsNav=$('commandsNav'),appsPanel=$('appsPanel'),commandsPanel=$('commandsPanel'),appsList=$('appsList'),refreshApps=$('refreshApps'),settingsNav=$('settingsNav'),settingsPanel=$('settingsPanel'),personaList=$('personaList'),orbButton=$('orbButton'),fishApiKey=$('fishApiKey'),gigaApiKey=$('gigaApiKey'),saveApiKeys=$('saveApiKeys'),checkUpdates=$('checkUpdates'),apiStatus=$('apiStatus');
 const personas=[['J.A.R.V.I.S.','Стандартный'],['Astra','Творческий'],['Luna','Аналитический'],['Terra','Практичный'],['Cyber','Безопасность']];
@@ -75,10 +77,15 @@ function filterApps(){const q=(document.getElementById('appsSearch')?.value||'')
 function loadApps(){
   if(!(window.AndroidJarvis&&typeof window.AndroidJarvis.listApps==='function')){appsList.innerHTML='<div class="app-empty">Список приложений доступен внутри APK JARVIS.</div>';return}
   try{
-    const apps=JSON.parse(window.AndroidJarvis.listApps());appsList.innerHTML='';
+    let apps;try{apps=JSON.parse(window.AndroidJarvis.listApps())}catch(e){appsList.innerHTML='<div class="app-empty">Ошибка парсинга списка приложений.</div>';return}
+    if(!Array.isArray(apps)){appsList.innerHTML='<div class="app-empty">Неверный формат списка приложений.</div>';return}
+    appsList.innerHTML='';
     apps.forEach(app=>{
+      if(!app||!app.packageName)return;
       const row=document.createElement('label');row.className='app-row';
-      row.innerHTML='<span>'+app.label+'</span><input type="checkbox" '+(app.allowed?'checked':'')+'>';
+      const label=app.label||app.packageName;
+      const allowed=app.allowed===true;
+      row.innerHTML='<span>'+label+'</span><input type="checkbox" '+(allowed?'checked':'')+'>';
       row.querySelector('input').addEventListener('change',e=>showMessage(window.AndroidJarvis.setAppAllowed(app.packageName,e.target.checked)));
       appsList.appendChild(row);
     });
@@ -93,7 +100,7 @@ function loadPersonas(){
     const row=document.createElement('label');row.className='app-row';
     row.innerHTML='<span><strong>'+name+'</strong><small> — '+description+'</small></span><input type="radio" name="persona" '+(state.persona===name?'checked':'')+'>';
     row.querySelector('input').addEventListener('change',()=>{
-      state.persona=name;localStorage.setItem('jarvisPersona',name);
+      state.persona=name;setPersonaVal(name);
       if(window.AndroidJarvis&&typeof window.AndroidJarvis.setPersona==='function')window.AndroidJarvis.setPersona(name);
       showMessage('Персонаж '+name+' выбран.');render();
     });

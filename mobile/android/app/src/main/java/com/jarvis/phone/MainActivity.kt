@@ -366,6 +366,7 @@ class MainActivity : Activity() {
                     )
                 }
             }
+            startWakeService()
             mainHandler.postDelayed({ startWakeListening() }, 350)
         } else {
             runOnUiThread {
@@ -549,6 +550,19 @@ class MainActivity : Activity() {
         val lower = s.lowercase(Locale("ru", "RU"))
         val marker = when { lower.startsWith("меня зовут ") -> "меня зовут "; lower.startsWith("моё имя ") -> "моё имя "; lower.startsWith("мое имя ") -> "мое имя "; else -> "" }
         if (marker.isNotEmpty()) memory.setUserName(s.substring(marker.length).trim().split(" ").firstOrNull().orEmpty())
+    }
+
+    private fun startWakeService() {
+        try {
+            val intent = Intent(this, JarvisWakeService::class.java)
+            if (android.os.Build.VERSION.SDK_INT >= 26) {
+                startForegroundService(intent)
+            } else {
+                startService(intent)
+            }
+        } catch (_: Exception) {
+            // Wake service is optional; continue with main activity
+        }
     }
 
     private fun startWakeListening() {
@@ -912,9 +926,17 @@ class MainActivity : Activity() {
         mainHandler.removeCallbacksAndMessages(null)
         backgroundExecutor.shutdownNow()
         speechRecognizer?.destroy()
-        tts?.stop()
-        tts?.shutdown()
-        fishAudioTts.release()
+        try {
+            tts?.stop()
+            tts?.shutdown()
+        } catch (_: Exception) {
+            // TTS may have failed initialization; safe to ignore
+        }
+        try {
+            fishAudioTts.release()
+        } catch (_: Exception) {
+            // Fish Audio TTS release failed; safe to ignore
+        }
         if (::webView.isInitialized) {
             webView.removeJavascriptInterface("AndroidJarvis")
             webView.destroy()

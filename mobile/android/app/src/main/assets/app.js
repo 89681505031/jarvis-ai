@@ -1,19 +1,136 @@
-const state={mode:'phone',persona:localStorage.getItem('jarvisPersona')||'J.A.R.V.I.S.',waitingForCommand:false};
-const $=id=>document.getElementById(id);const message=$('message'),command=$('command'),send=$('send'),modeButton=$('modeButton'),modeNav=$('modeNav'),appsNav=$('appsNav'),commandsNav=$('commandsNav'),appsPanel=$('appsPanel'),commandsPanel=$('commandsPanel'),appsList=$('appsList'),refreshApps=$('refreshApps'),settingsNav=$('settingsNav'),settingsPanel=$('settingsPanel'),personaList=$('personaList'),orbButton=$('orbButton'),fishApiKey=$('fishApiKey'),gigaApiKey=$('gigaApiKey'),saveApiKeys=$('saveApiKeys'),checkUpdates=$('checkUpdates'),apiStatus=$('apiStatus');
-const personas=[['J.A.R.V.I.S.','Координация и общий помощник'],['Astra','Творчество и идеи'],['Luna','Анализ и знания'],['Terra','Практические задачи'],['Cyber','Безопасность и защита']];
-const wakeWords=['джарвис','jarvis','астра','astra','луна','luna','сайбер','cyber','терра','terra'];
-const activationPersonas={'джарвис':'J.A.R.V.I.S.','jarvis':'J.A.R.V.I.S.','астра':'Astra','astra':'Astra','луна':'Luna','luna':'Luna','сайбер':'Cyber','cyber':'Cyber','терра':'Terra','terra':'Terra'};
-function showMessage(t){message.textContent=t||''}function activatePersona(word){const persona=activationPersonas[(word||'').toLowerCase()];if(!persona)return;state.persona=persona;localStorage.setItem('jarvisPersona',persona);window.AndroidJarvis?.setPersona?.(persona);showMessage('Активирован персонаж: '+persona)}function render(){modeButton.textContent=state.mode==='phone'?'📱 PHONE MODE':'🖥️ PC MODE';modeNav.textContent=state.mode==='phone'?'📱 Телефон':'🖥️ ПК';showMessage('Готов к работе, '+(localStorage.getItem('jarvisName')||'сэр')+'. Персонаж: '+state.persona)}
-function sendCommand(v){const text=(v||command.value).trim();if(!text)return;state.waitingForCommand=false;showMessage('Выполняю: «'+text+'»');try{const r=window.AndroidJarvis?.command(text);if(r){showMessage(r);const asyncNative=/^(Получаю свежую сводку новостей|Читаю последнее сообщение WhatsApp|Открываю WhatsApp)/i.test(r);if(!asyncNative){window.AndroidJarvis?.speak(r);window.AndroidJarvis?.startConversationWindow(12)}}else showMessage('Обрабатываю запрос…')}catch(e){showMessage('Ошибка: '+e.message)}command.value=''}
-function startListening(){if(!window.AndroidJarvis?.startListening){showMessage('Голосовой ввод доступен в APK.');return}state.waitingForCommand=true;showMessage('Слушаю…');window.AndroidJarvis.startListening()}
-function onSpeechError(text){state.waitingForCommand=false;showMessage(text||'Голосовой ввод остановлен.')}
-function onSpeechReady(){state.waitingForCommand=false;render()}
-function onSpeechResult(text){const clean=(text||'').trim();if(!clean){showMessage('Не удалось распознать речь.');return}const wake=/^(джарвис|jarvis|астра|astra|луна|luna|сайбер|cyber|терра|terra)[,\s.!?]*/i;const matched=clean.match(wake);const activation=(matched?.[1]||'').toLowerCase();const onlyWake=wakeWords.includes(clean.toLowerCase().replace(/[,.!?]/g,''));if(activation)activatePersona(activation);if(onlyWake){state.waitingForCommand=true;showMessage('Слушаю… Персонаж: '+state.persona);window.AndroidJarvis?.speak('Слушаю');window.AndroidJarvis?.startConversationWindow(10);return}if(state.waitingForCommand){sendCommand(clean);return}if(!matched)return;const rest=clean.replace(wake,'').trim();if(!rest){state.waitingForCommand=true;showMessage('Слушаю… Персонаж: '+state.persona);window.AndroidJarvis?.speak('Слушаю');window.AndroidJarvis?.startConversationWindow(10);return}window.AndroidJarvis?.speak('Да');sendCommand(rest)}
-window.onJarvisSpeechResult=onSpeechResult;window.onJarvisSpeechError=onSpeechError;window.onJarvisSpeechReady=onSpeechReady;window.onGigaChatResult=t=>{showMessage(t)};
-function filterApps(){const q=($('appsSearch')?.value||'').toLowerCase();document.querySelectorAll('#appsList .app-row').forEach(r=>r.hidden=!((r.querySelector('span')?.textContent||'').toLowerCase().includes(q)))}
-function loadApps(){try{const apps=JSON.parse(window.AndroidJarvis?.listApps?.()||'[]');appsList.innerHTML='';apps.forEach(a=>{const row=document.createElement('label');row.className='app-row';row.innerHTML='<span>'+a.label+'</span><input type="checkbox" '+(a.allowed?'checked':'')+'>';row.querySelector('input').onchange=e=>showMessage(window.AndroidJarvis.setAppAllowed(a.packageName,e.target.checked));appsList.appendChild(row)});if(!apps.length)appsList.innerHTML='<div class="app-empty">Приложения не найдены.</div>';filterApps()}catch(e){appsList.innerHTML='<div class="app-empty">Не удалось загрузить приложения.</div>'}}
-function selectAllApps(){document.querySelectorAll('#appsList input[type=checkbox]').forEach(i=>{if(!i.checked){i.checked=true;i.dispatchEvent(new Event('change'))}})}
-function loadPersonas(){personaList.innerHTML='';personas.forEach(([n,d])=>{const r=document.createElement('label');r.className='app-row';r.innerHTML='<span><strong>'+n+'</strong><small> — '+d+'</small></span><input type="radio" name="persona" '+(state.persona===n?'checked':'')+'>';r.querySelector('input').onchange=()=>{state.persona=n;localStorage.setItem('jarvisPersona',n);window.AndroidJarvis?.setPersona(n);render()};personaList.appendChild(r)})}
-function register(){const n=$('profileName').value.trim(),d=+$('profileDay').value,m=+$('profileMonth').value,y=+$('profileYear').value,rf=$('regFishApiKey')?.value.trim()||'',rg=$('regGigaApiKey')?.value.trim()||'';if(!n||d<1||d>31||m<1||m>12||y<1900||y>2100){showMessage('Заполните имя и дату рождения корректно.');return}localStorage.setItem('jarvisName',n);localStorage.setItem('jarvisBirth',JSON.stringify({day:d,month:m,year:y}));if(rf||rg)window.AndroidJarvis?.setApiKeys?.(rf,rg);$('registration').hidden=true;showMessage('Добро пожаловать, '+n+'. Я JARVIS.');window.AndroidJarvis?.setUserProfile?.(n,d,m,y);window.AndroidJarvis?.command?.('меня зовут '+n);window.AndroidJarvis?.speak?.('Добро пожаловать, '+n);render()}
-if($('saveProfile'))$('saveProfile').onclick=register;if(localStorage.getItem('jarvisName'))$('registration').hidden=true;else $('registration').hidden=false;
-modeButton.onclick=()=>{state.mode=state.mode==='phone'?'pc':'phone';render()};modeNav.onclick=()=>{state.mode=state.mode==='phone'?'pc':'phone';render()};appsNav.onclick=()=>{appsPanel.hidden=!appsPanel.hidden;commandsPanel.hidden=true;settingsPanel.hidden=true;if(!appsPanel.hidden)loadApps()};commandsNav.onclick=()=>{commandsPanel.hidden=!commandsPanel.hidden;appsPanel.hidden=true;settingsPanel.hidden=true};settingsNav.onclick=()=>{settingsPanel.hidden=!settingsPanel.hidden;appsPanel.hidden=true;commandsPanel.hidden=true;if(!settingsPanel.hidden)loadPersonas()};refreshApps.onclick=loadApps;if($('selectAllApps'))$('selectAllApps').onclick=selectAllApps;if($('appsSearch'))$('appsSearch').oninput=filterApps;send.onclick=()=>sendCommand();command.onkeydown=e=>{if(e.key==='Enter')sendCommand()};orbButton.onclick=startListening;orbButton.onkeydown=e=>{if(e.key==='Enter'||e.key===' ')startListening()};saveApiKeys.onclick=()=>{apiStatus.textContent=window.AndroidJarvis?.setApiKeys?.(fishApiKey.value.trim(),gigaApiKey.value.trim())||'Сохранение доступно в APK'};checkUpdates.onclick=()=>window.AndroidJarvis?.checkUpdates?.();render();
+const state={mode:'phone',persona:getPersona()||'J.A.R.V.I.S.',waitingForCommand:false};
+function getPersona(){try{return localStorage.getItem('jarvisPersona')}catch(e){return null}}
+function setPersonaVal(v){try{localStorage.setItem('jarvisPersona',v)}catch(e){}}
+const $=id=>document.getElementById(id);
+const message=$('message'),command=$('command'),send=$('send'),modeButton=$('modeButton'),modeNav=$('modeNav'),appsNav=$('appsNav'),commandsNav=$('commandsNav'),appsPanel=$('appsPanel'),commandsPanel=$('commandsPanel'),appsList=$('appsList'),refreshApps=$('refreshApps'),settingsNav=$('settingsNav'),settingsPanel=$('settingsPanel'),personaList=$('personaList'),orbButton=$('orbButton'),fishApiKey=$('fishApiKey'),gigaApiKey=$('gigaApiKey'),saveApiKeys=$('saveApiKeys'),checkUpdates=$('checkUpdates'),apiStatus=$('apiStatus');
+const personas=[['J.A.R.V.I.S.','Стандартный'],['Astra','Творческий'],['Luna','Аналитический'],['Terra','Практичный'],['Cyber','Безопасность']];
+
+function showMessage(text){message.textContent=text||''}
+function render(){
+  const phone=state.mode==='phone';
+  modeButton.textContent=phone?'📱 PHONE MODE':'🖥️ PC MODE';
+  modeNav.textContent=phone?'📱 Телефон':'🖥️ ПК';
+  if(!phone){appsPanel.hidden=true;commandsPanel.hidden=true}
+  showMessage(phone?'Готов к работе, сэр. Персонаж: '+state.persona:'Готов к управлению компьютером, сэр.');
+}
+function sendCommand(textOverride){
+  const text=(textOverride||command.value).trim();
+  if(!text)return;
+  state.waitingForCommand=false;
+  showMessage('Выполняю: «'+text+'»');
+  if(state.mode==='phone'&&window.AndroidJarvis){
+    try{
+      const result=window.AndroidJarvis.command(text);
+      if(result){
+        showMessage(result);
+        if(typeof window.AndroidJarvis.speak==='function')window.AndroidJarvis.speak(result);
+        if(typeof window.AndroidJarvis.startConversationWindow==='function')window.AndroidJarvis.startConversationWindow(12);
+      }else showMessage('Обрабатываю запрос…');
+    }catch(e){showMessage('Ошибка выполнения команды: '+e.message)}
+  }else if(state.mode==='phone')showMessage('PHONE MODE работает в APK JARVIS.');
+  else showMessage('PC MODE: подключение к компьютеру будет следующим этапом.');
+  command.value='';
+}
+function startListening(){
+  if(!(window.AndroidJarvis&&typeof window.AndroidJarvis.startListening==='function')){showMessage('Голосовой ввод доступен в APK JARVIS.');return}
+  state.waitingForCommand=true;showMessage('Слушаю…');window.AndroidJarvis.startListening();
+}
+function onSpeechResult(text){
+  if(!text){showMessage('Не удалось распознать речь.');return}
+  const clean=text.trim();
+  const wake=/^(джарвис|jarvis|астра|astra|луна|luna|сайбер|cyber|терра|terra)[,\s.!?]*/i;
+  if(state.waitingForCommand){sendCommand(clean);return}
+  if(!wake.test(clean))return;
+  const spokenWake=clean.match(wake)?.[1]?.toLowerCase()||'';
+  const active=String(state.persona||'J.A.R.V.I.S.').toLowerCase().replace(/[^a-zа-яё]/g,'');
+  const aliases={
+    'джарвис':'jarvis','jarvis':'jarvis',
+    'астра':'astra','astra':'astra',
+    'луна':'luna','luna':'luna',
+    'сайбер':'cyber','cyber':'cyber',
+    'терра':'terra','terra':'terra'
+  };
+  const activeKey=aliases[active]||'jarvis';
+  const spokenKey=aliases[spokenWake]||spokenWake;
+  if(spokenKey!==activeKey){
+    const activeName=state.persona==='J.A.R.V.I.S.'?'Джарвис':state.persona;
+    showMessage('Я не '+spokenWake+', я '+activeName+'.');
+    if(window.AndroidJarvis&&typeof window.AndroidJarvis.speak==='function')window.AndroidJarvis.speak('Я не '+spokenWake+', я '+activeName+'.');
+    return;
+  }
+  const commandText=clean.replace(wake,'').trim();
+  if(!commandText){
+    state.waitingForCommand=true;
+    showMessage('Слушаю…');
+    if(window.AndroidJarvis&&typeof window.AndroidJarvis.speak==='function')window.AndroidJarvis.speak('Слушаю');
+    if(window.AndroidJarvis&&typeof window.AndroidJarvis.startConversationWindow==='function')window.AndroidJarvis.startConversationWindow(10);
+    return
+  }
+  if(window.AndroidJarvis&&typeof window.AndroidJarvis.speak==='function')window.AndroidJarvis.speak('Да');
+  if(window.AndroidJarvis&&typeof window.AndroidJarvis.startConversationWindow==='function')window.AndroidJarvis.startConversationWindow(10);
+  sendCommand(commandText);
+}
+window.onJarvisSpeechResult=onSpeechResult;
+window.onGigaChatResult=function(text){showMessage(text)};
+
+function filterApps(){const q=(document.getElementById('appsSearch')?.value||'').trim().toLowerCase();document.querySelectorAll('#appsList .app-row').forEach(row=>{const n=(row.querySelector('span')?.textContent||'').toLowerCase();row.hidden=!!q&&!n.includes(q)})}
+function loadApps(){
+  if(!(window.AndroidJarvis&&typeof window.AndroidJarvis.listApps==='function')){appsList.innerHTML='<div class="app-empty">Список приложений доступен внутри APK JARVIS.</div>';return}
+  try{
+    let apps;try{apps=JSON.parse(window.AndroidJarvis.listApps())}catch(e){appsList.innerHTML='<div class="app-empty">Ошибка парсинга списка приложений.</div>';return}
+    if(!Array.isArray(apps)){appsList.innerHTML='<div class="app-empty">Неверный формат списка приложений.</div>';return}
+    appsList.innerHTML='';
+    apps.forEach(app=>{
+      if(!app||!app.packageName)return;
+      const row=document.createElement('label');row.className='app-row';
+      const label=app.label||app.packageName;
+      const allowed=app.allowed===true;
+      row.innerHTML='<span>'+label+'</span><input type="checkbox" '+(allowed?'checked':'')+'>';
+      row.querySelector('input').addEventListener('change',e=>showMessage(window.AndroidJarvis.setAppAllowed(app.packageName,e.target.checked)));
+      appsList.appendChild(row);
+    });
+    if(!apps.length)appsList.innerHTML='<div class="app-empty">Приложения не найдены.</div>';
+  }catch(e){appsList.innerHTML='<div class="app-empty">Не удалось загрузить приложения.</div>'}
+}
+function toggleApps(){commandsPanel.hidden=true;settingsPanel.hidden=true;if(state.mode!=='phone')state.mode='phone';appsPanel.hidden=!appsPanel.hidden;if(!appsPanel.hidden)loadApps()}
+function toggleCommands(){appsPanel.hidden=true;settingsPanel.hidden=true;commandsPanel.hidden=!commandsPanel.hidden}
+function loadPersonas(){
+  personaList.innerHTML='';
+  personas.forEach(([name,description])=>{
+    const row=document.createElement('label');row.className='app-row';
+    row.innerHTML='<span><strong>'+name+'</strong><small> — '+description+'</small></span><input type="radio" name="persona" '+(state.persona===name?'checked':'')+'>';
+    row.querySelector('input').addEventListener('change',()=>{
+      state.persona=name;setPersonaVal(name);
+      if(window.AndroidJarvis&&typeof window.AndroidJarvis.setPersona==='function')window.AndroidJarvis.setPersona(name);
+      showMessage('Персонаж '+name+' выбран.');render();
+    });
+    personaList.appendChild(row);
+  });
+  if(window.AndroidJarvis&&typeof window.AndroidJarvis.getApiKeyStatus==='function'){
+    try{const s=JSON.parse(window.AndroidJarvis.getApiKeyStatus());apiStatus.textContent='Fish Audio: '+(s.fish?'✓ настроен':'не настроен')+' · GigaChat: '+(s.giga?'✓ настроен':'не настроен')}catch(e){}
+  }
+}
+function toggleSettings(){appsPanel.hidden=true;commandsPanel.hidden=true;settingsPanel.hidden=!settingsPanel.hidden;if(!settingsPanel.hidden)loadPersonas()}
+function saveKeys(){
+  const fish=fishApiKey.value.trim(),giga=gigaApiKey.value.trim();
+  if(!fish&&!giga){apiStatus.textContent='Введите хотя бы один ключ.';return}
+  if(window.AndroidJarvis&&typeof window.AndroidJarvis.setApiKeys==='function'){
+    try{apiStatus.textContent=window.AndroidJarvis.setApiKeys(fish,giga);fishApiKey.value='';gigaApiKey.value=''}catch(e){apiStatus.textContent='Ошибка сохранения: '+e.message}
+  }else apiStatus.textContent='Сохранение доступно в APK JARVIS.';
+}
+function askUpdates(){if(window.AndroidJarvis&&typeof window.AndroidJarvis.checkUpdates==='function')window.AndroidJarvis.checkUpdates();else showMessage('Проверка обновлений доступна в APK JARVIS.')}
+
+modeButton.addEventListener('click',()=>{state.mode=state.mode==='phone'?'pc':'phone';render()});
+modeNav.addEventListener('click',()=>{state.mode=state.mode==='phone'?'pc':'phone';render()});
+appsNav.addEventListener('click',toggleApps);
+commandsNav.addEventListener('click',toggleCommands);
+settingsNav.addEventListener('click',toggleSettings);
+refreshApps.addEventListener('click',loadApps);document.getElementById('appsSearch')?.addEventListener('input',filterApps);
+saveApiKeys.addEventListener('click',saveKeys);
+checkUpdates.addEventListener('click',askUpdates);
+send.addEventListener('click',()=>sendCommand());
+command.addEventListener('keydown',e=>{if(e.key==='Enter')sendCommand()});
+orbButton.addEventListener('click',startListening);
+orbButton.addEventListener('keydown',e=>{if(e.key==='Enter'||e.key===' ')startListening()});
+
+render();

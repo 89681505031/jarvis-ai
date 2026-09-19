@@ -17,7 +17,7 @@ class GigaChatClient(private val context: Context) {
 
     @Volatile private var accessToken: String? = null
     @Volatile private var tokenExpiresAt: Long = 0L
-    @Volatile private var tokenKeyFingerprint: Int? = null
+    @Volatile private var tokenKeyHash: Long = 0L
 
     fun ask(userText: String, persona: String, memoryContext: String = ""): String {
         val key = context.getSharedPreferences("jarvis_settings", Context.MODE_PRIVATE)
@@ -68,7 +68,7 @@ class GigaChatClient(private val context: Context) {
     }
 
     @Synchronized private fun invalidateToken(key: String) {
-        if (tokenKeyFingerprint == key.hashCode()) {
+        if (tokenKeyHash == hashKey(key)) {
             accessToken = null
             tokenExpiresAt = 0L
         }
@@ -76,11 +76,11 @@ class GigaChatClient(private val context: Context) {
 
     @Synchronized private fun getToken(key: String): String {
         val now = System.currentTimeMillis()
-        val fingerprint = key.hashCode()
-        if (tokenKeyFingerprint != fingerprint) {
+        val keyHash = hashKey(key)
+        if (tokenKeyHash != keyHash) {
             accessToken = null
             tokenExpiresAt = 0L
-            tokenKeyFingerprint = fingerprint
+            tokenKeyHash = keyHash
         }
         accessToken?.let { if (now + 60_000L < tokenExpiresAt) return it }
         val response = postForm(TOKEN_URL, "scope=GIGACHAT_API_PERS", mapOf(
@@ -125,6 +125,14 @@ class GigaChatClient(private val context: Context) {
             if (code !in 200..299) throw IllegalStateException("HTTP $code: ${extractError(text)}")
             text
         } finally { connection.disconnect() }
+    }
+
+    private fun hashKey(key: String): Long {
+        var hash = 1L
+        for (i in key.indices) {
+            hash = (hash * 31 + key[i].code) and 0x7FFFFFFFFFFFFFFFL
+        }
+        return hash
     }
 
     private fun extractError(text: String): String = try {
