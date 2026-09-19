@@ -8010,8 +8010,8 @@ class JARVISUltimate(tk.Tk):
                             # === ПРИОРИТЕТ: VOSK (быстро, оффлайн) ===
                             try:
                                 log.info("🎤 Отправляю в Vosk Speech Recognition...")
-                                # Преобразуем audio в формат для Vosk
-                                raw_data = audio.get_raw_data(sample_rate=16000)
+                                # Получаем сырые данные (без sample_rate — он уже 16kHz из listen())
+                                raw_data = audio.raw_data
                                 
                                 import vosk
                                 # Импортируем глобальный recognizer из vosk_recognition
