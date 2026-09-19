@@ -10,6 +10,7 @@ import android.os.Handler
 import android.os.Looper
 import android.provider.ContactsContract
 import android.provider.Settings
+import android.view.KeyEvent
 import androidx.core.content.ContextCompat
 import androidx.core.app.ActivityCompat
 import java.util.Locale
@@ -97,19 +98,40 @@ class PhoneCommandRouter(private val context: Context) {
         return try {
             if (query.isBlank()) {
                 if (!openPackage(packageName)) return "Яндекс Музыка не установлена."
+                Handler(Looper.getMainLooper()).postDelayed({ sendMediaKey(KeyEvent.KEYCODE_MEDIA_PLAY) }, 900)
                 "Открываю Яндекс Музыку."
             } else {
-                val intent = Intent(Intent.ACTION_VIEW, Uri.parse("yandexmusic://search?text=" + Uri.encode(query)))
-                    .setPackage(packageName)
-                    .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                context.startActivity(intent)
-                Handler(Looper.getMainLooper()).postDelayed({
-                    JarvisAccessibilityService.instance?.clickAnyText("Слушать", "Воспроизвести", "Play", "▶")
-                }, 1400)
-                "Ищу «$query» и включаю первый найденный трек."
+                val deepLink = Intent(
+                    Intent.ACTION_VIEW,
+                    Uri.parse("yandexmusic://search?text=" + Uri.encode(query))
+                ).setPackage(packageName).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+
+                try {
+                    context.startActivity(deepLink)
+                } catch (_: Exception) {
+                    if (!openPackage(packageName)) return "Яндекс Музыка не установлена."
+                }
+
+                val handler = Handler(Looper.getMainLooper())
+                listOf(1100L, 2200L, 3400L).forEachIndexed { index, delay ->
+                    handler.postDelayed({
+                        val service = JarvisAccessibilityService.instance
+                        val clicked = service?.clickAnyText(
+                            query,
+                            "Слушать",
+                            "Воспроизвести",
+                            "Play",
+                            "▶"
+                        ) == true
+                        if (clicked || index == 2) {
+                            handler.postDelayed({ sendMediaKey(KeyEvent.KEYCODE_MEDIA_PLAY) }, 450)
+                        }
+                    }, delay)
+                }
+                "Ищу «$query» и включаю найденный трек."
             }
         } catch (_: Exception) {
-            "Не удалось открыть Яндекс Музыку. Установите приложение Яндекс Музыка."
+            "Не удалось открыть Яндекс Музыку. Проверьте, что приложение установлено."
         }
     }
 
@@ -119,29 +141,57 @@ class PhoneCommandRouter(private val context: Context) {
     }
 
     private fun musicControl(action: String): String {
+        val keyCode = when (action) {
+            "stop" -> KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE
+            "next" -> KeyEvent.KEYCODE_MEDIA_NEXT
+            else -> KeyEvent.KEYCODE_MEDIA_PREVIOUS
+        }
+
+        if (sendMediaKey(keyCode)) {
+            return when (action) {
+                "stop" -> "Музыка поставлена на паузу или продолжена."
+                "next" -> "Переключаю на следующий трек."
+                else -> "Переключаю на предыдущий трек."
+            }
+        }
+
         val service = JarvisAccessibilityService.instance
-            ?: return "Для управления Яндекс Музыкой включите J.A.R.V.I.S. в специальных возможностях Android."
         val clicked = when (action) {
-            "stop" -> service.clickAnyText("Пауза", "Pause", "Стоп", "Stop")
-            "next" -> service.clickAnyText("Следующий трек", "Следующая песня", "Дальше", "Next")
-            else -> service.clickAnyText("Предыдущий трек", "Предыдущая песня", "Назад", "Previous")
+            "stop" -> service?.clickAnyText("Пауза", "Pause", "Стоп", "Stop") == true
+            "next" -> service?.clickAnyText("Следующий трек", "Следующая песня", "Дальше", "Next") == true
+            else -> service?.clickAnyText("Предыдущий трек", "Предыдущая песня", "Назад", "Previous") == true
         }
         return if (clicked) {
             when (action) {
-                "stop" -> "Музыка остановлена."
+                "stop" -> "Музыка поставлена на паузу или продолжена."
                 "next" -> "Переключаю на следующий трек."
                 else -> "Переключаю на предыдущий трек."
             }
         } else {
-            "Не удалось управлять воспроизведением. Откройте Яндекс Музыку и убедитесь, что J.A.R.V.I.S. имеет доступ в специальных возможностях."
+            "Не удалось управлять воспроизведением. Запустите Яндекс Музыку хотя бы один раз."
+        }
+    }
+
+    private fun sendMediaKey(keyCode: Int): Boolean {
+        return try {
+            val audio = context.getSystemService(Context.AUDIO_SERVICE) as? android.media.AudioManager
+                ?: return false
+            val down = KeyEvent(KeyEvent.ACTION_DOWN, keyCode)
+            val up = KeyEvent(KeyEvent.ACTION_UP, keyCode)
+            audio.dispatchMediaKeyEvent(down)
+            audio.dispatchMediaKeyEvent(up)
+            true
+        } catch (_: Exception) {
+            false
         }
     }
 
     fun openWhatsAppForReading(): String {
-        val packageName = launcherApps()
-            .filter { normalizeAppName(it.label).contains("whatsapp") }
-            .sortedBy { it.packageName }
-            .firstOrNull()?.packageName
+        val preferredPackages = listOf("com.whatsapp", "com.whatsapp.w4b")
+        val packageName = preferredPackages.firstOrNull { pm.getLaunchIntentForPackage(it) != null }
+            ?: launcherApps()
+                .firstOrNull { normalizeAppName(it.label).contains("whatsapp") }
+                ?.packageName
             ?: return "WhatsApp не установлен."
         return if (openPackage(packageName)) {
             "Открываю WhatsApp и читаю последнее сообщение."
